@@ -56,8 +56,8 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-2">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-              Your Player Status
+            <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono border border-blue-100">
+              {currentPlayer.player_id || 'ENG-0001'}
             </span>
             <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
               <Clock className="w-3 h-3 text-amber-600" />

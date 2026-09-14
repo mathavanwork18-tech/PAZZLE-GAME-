@@ -518,6 +518,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2">
+                    <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
+                      {p.player_id || p.id}
+                    </span>
                     <span className="text-xs font-bold text-slate-900 truncate">{p.name}</span>
                     <span
                       title={p.connection_status === 'connected' ? 'Connected' : 'Disconnected'}
@@ -526,8 +529,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                       }`}
                     />
                   </div>
-                  <div className="text-[10px] text-slate-500">
-                    <span className="capitalize">{p.animal_id}</span> • Status: <strong className="text-blue-700">{p.status}</strong>
+                  <div className="text-[10px] text-slate-500 truncate mt-0.5">
+                    <span className="capitalize font-medium text-slate-700">{p.animal_id}</span>
+                    {p.hat_id && p.hat_id !== 'none' && <span> • Hat: <span className="capitalize">{p.hat_id.replace(/_/g, ' ')}</span></span>}
+                    {p.glasses_id && p.glasses_id !== 'none' && <span> • Glasses: <span className="capitalize">{p.glasses_id.replace(/_/g, ' ')}</span></span>}
+                    {p.outfit_id && p.outfit_id !== 'none' && <span> • Outfit: <span className="capitalize">{p.outfit_id.replace(/_/g, ' ')}</span></span>}
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                    Round: <strong className="text-blue-600">{p.completed_round_1 ? 'Round 2' : 'Round 1'}</strong> • Status: <strong className="text-slate-700 uppercase">{p.status}</strong>
                   </div>
                 </div>
 

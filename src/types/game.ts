@@ -63,6 +63,8 @@ export interface CustomizationOption {
 
 export interface Player {
   id: string;
+  player_id?: string;
+  username_normalized?: string;
   name: string;
   animal_id: string;
   hat_id: HatId;

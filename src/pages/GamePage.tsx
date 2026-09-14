@@ -160,7 +160,7 @@ export const GamePage: React.FC<GamePageProps> = ({
           <CountdownTimer
             endTimestamp={matchEndTime}
             serverNowOffset={serverNowOffset}
-            isPaused={matchState.is_paused}
+            isPaused={matchState.is_paused || isMatchStopped}
             onTimeUp={() => {
               sounds.playGameOver();
             }}
@@ -345,6 +345,51 @@ export const GamePage: React.FC<GamePageProps> = ({
             >
               <span>VIEW FULL LEADERBOARD</span>
               <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 7. Game Stopped Modal (Admin STOP Triggered) */}
+      {isMatchStopped && (
+        <div className="fixed inset-0 z-50 bg-slate-900/85 backdrop-blur-md flex flex-col items-center justify-center animate-fade-in p-6 text-center">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full border border-slate-200 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto mb-3">
+              <Ban className="w-6 h-6" />
+            </div>
+
+            <div className="text-xs font-bold text-amber-600 uppercase tracking-widest font-mono mb-1">
+              Event Status
+            </div>
+
+            <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">
+              Game Stopped
+            </h3>
+
+            <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+              {matchState.stop_reason || 'The administrator has stopped this challenge.'}
+            </p>
+
+            <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200 text-xs font-mono text-slate-600 mb-4 text-left space-y-1.5">
+              <div className="flex justify-between">
+                <span>Player:</span>
+                <span className="font-bold text-slate-900">{player.name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total Score:</span>
+                <span className="font-bold text-blue-700">{player.total_score}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Coins Saved:</span>
+                <span className="font-bold text-amber-600">{player.coins}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={onGoToResults}
+              className="w-full py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition-all btn-press"
+            >
+              VIEW EVENT LEADERBOARD
             </button>
           </div>
         </div>

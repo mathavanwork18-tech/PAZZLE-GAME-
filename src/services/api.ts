@@ -214,15 +214,27 @@ export async function adminRemovePlayer(token: string, playerId: string): Promis
   });
 }
 
-export async function adminGeneratePuzzle(token: string, topic: string, difficulty: string): Promise<any> {
-  const res = await fetch(`${API_BASE}/admin/generate-puzzle`, {
+export async function updateAvatar(
+  sessionToken: string,
+  config: { animal_id?: string; hat_id?: HatId | string; glasses_id?: GlassesId | string; outfit_id?: OutfitId | string }
+): Promise<{ player: Player }> {
+  const res = await fetch(`${API_BASE}/player/update-avatar`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
-    body: JSON.stringify({ topic, difficulty })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_token: sessionToken, ...config })
   });
   const data = await res.json();
   if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Failed to generate puzzle.');
+    throw new Error(data.error || 'Failed to update avatar.');
   }
-  return data.puzzle;
+  return data;
 }
+
+export async function fetchAdminPlayers(token: string): Promise<Player[]> {
+  const res = await fetch(`${API_BASE}/admin/players`, {
+    headers: { 'x-admin-token': token }
+  });
+  const data = await res.json();
+  return data.players || [];
+}
+

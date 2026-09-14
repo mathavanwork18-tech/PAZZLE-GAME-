@@ -73,10 +73,15 @@ export const ResultPage: React.FC<ResultPageProps> = ({
           />
 
           <div className="flex-1 text-center sm:text-left">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">
-              Participating Student
+            <div className="flex items-center justify-center sm:justify-start space-x-2">
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider font-mono border border-blue-200">
+                {currentPlayer.player_id || 'ENG-0001'}
+              </span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">
+                Student
+              </span>
             </div>
-            <h3 className="text-2xl font-black text-slate-900 truncate">
+            <h3 className="text-2xl font-black text-slate-900 truncate mt-1">
               {currentPlayer.name}
             </h3>
             <p className="text-xs text-slate-500 capitalize">
