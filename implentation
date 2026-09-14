@@ -1,0 +1,5087 @@
+ENGINEERING DAY PUZZLE CHALLENGE
+MASTER FULL-STACK BUILD PROMPT
+
+You are an expert full-stack engineer, UI/UX designer, real-time systems engineer, game developer, database architect, and QA engineer.
+
+Build a complete, production-quality, mobile-first web application called:
+
+ENGINEERING DAY — PUZZLE CHALLENGE
+
+This is a college Engineering Day event.
+
+The application is a real-time multiplayer image puzzle game.
+
+The application must support approximately 40 simultaneous players comfortably and must be designed so that all players can participate in the same match without state collisions, duplicate submissions, timer inconsistencies, player duplication, or race conditions.
+
+Do not build a simple static quiz.
+
+Build a real multiplayer event game with:
+
+Player joining
+Name selection
+Cartoon animal avatar selection
+Real-time lobby
+Admin-controlled match start
+Round 1 puzzle
+Round 2 hard puzzle
+Real-time timers
+Automatic puzzle validation
+Score calculation
+Game-over handling
+Final results
+Admin dashboard
+Gemini AI-assisted puzzle generation
+Match management
+Player monitoring
+Reconnection handling
+Duplicate prevention
+Server-authoritative game state
+Robust error handling
+Mobile-first UI
+
+The final result must feel like a polished college event game, not a generic CRUD application.
+
+==================================================
+
+CORE OBJECTIVE
+==================================================
+
+Create a mobile website where students participating in Engineering Day can join a live puzzle challenge from their phones.
+
+The basic flow is:
+
+PLAYER
+↓
+OPEN WEBSITE
+↓
+ENTER NAME
+↓
+SELECT CARTOON ANIMAL AVATAR
+↓
+JOIN GAME
+↓
+MAIN LOBBY
+↓
+WAIT FOR ADMIN
+↓
+ADMIN STARTS MATCH
+↓
+ROUND 1 — SIMPLE IMAGE PUZZLE
+↓
+SOLVE PUZZLE
+↓
+SCORE
+↓
+ROUND 2 — HARD IMAGE PUZZLE
+↓
+10-MINUTE TIMER
+↓
+SOLVE BEFORE TIME ENDS
+↓
+FINAL SCORE
+↓
+RESULT SCREEN
+
+If the Round 2 timer reaches zero before the player solves the puzzle:
+
+ROUND 2
+↓
+TIME = 00:00
+↓
+INPUT LOCKED
+↓
+GAME OVER
+↓
+FINAL RESULT
+
+Do not create a fake-looking prototype.
+
+Do not create fake multiplayer behavior.
+
+Do not simulate real-time users with local arrays.
+
+Do not use hardcoded player lists.
+
+Do not create fake timers that only run visually.
+
+Do not make the admin start button work only on the admin device.
+
+Do not store critical match state only in localStorage.
+
+Do not trust the client for final scoring.
+
+Do not trust the client timer.
+
+Do not allow duplicate players because of double-clicking.
+
+Do not allow two simultaneous admin actions to corrupt the match.
+
+Do not allow two players to overwrite one another.
+
+Use a proper persistent backend and real-time synchronization.
+
+The backend must be authoritative for:
+
+Match status
+Current round
+Round start time
+Round end time
+Player status
+Puzzle assignment
+Completion state
+Score
+Final result
+Game-over state
+
+Use the following stack unless there is a strong technical reason to change it:
+
+Frontend:
+
+React
+TypeScript
+Vite
+Tailwind CSS
+Modern component architecture
+
+Backend:
+
+Supabase
+PostgreSQL
+Supabase Realtime
+Supabase Edge Functions where server-side logic is required
+
+AI:
+
+Gemini API
+
+Deployment:
+
+Vercel or another reliable HTTPS hosting provider
+
+Use environment variables for all secrets.
+
+Never expose:
+
+Gemini API key
+Supabase service-role key
+Admin secret
+Server-side credentials
+
+inside frontend source code.
+
+The public client may use only safe public configuration such as the Supabase anonymous key.
+
+The application is primarily designed for smartphones.
+
+Assume participants will open it using:
+
+Android phones
+iPhones
+Chrome
+Safari
+Edge
+Samsung Internet
+
+The UI must work from approximately:
+
+320px width
+
+through:
+
+480px width
+
+and should remain usable on tablets and desktops.
+
+Do not design desktop first.
+
+Design mobile first.
+
+All important controls must be reachable using one hand.
+
+Avoid tiny buttons.
+
+Avoid tiny text.
+
+Avoid horizontal scrolling.
+
+Avoid complicated menus.
+
+Do not make users zoom.
+
+Puzzle pieces must be touch friendly.
+
+Drag-and-drop must work with touch.
+
+Also support tap-to-swap as a fallback.
+
+The visual identity should feel:
+
+Modern
+Peaceful
+Friendly
+Competitive
+Academic
+Engineering-themed
+Clean
+Premium
+Fun without becoming childish
+
+Use a calm visual system.
+
+Avoid excessive neon.
+
+Avoid aggressive gaming graphics.
+
+Avoid excessive animations.
+
+Avoid visual clutter.
+
+Use:
+
+White/light surfaces
+Soft blue
+Deep navy
+Engineering cyan
+Subtle purple accents
+Soft gradients
+Rounded cards
+Clean shadows
+High contrast text
+
+Use smooth transitions.
+
+Animations must never interfere with gameplay.
+
+Do not use emojis as the primary visual interface.
+
+Use the generated animal avatar artwork.
+
+Use proper icons.
+
+Create these major routes/screens:
+
+PUBLIC PLAYER:
+
+/
+Welcome screen
+
+/join
+Name and avatar selection
+
+/lobby
+Main player lobby
+
+/game
+Active puzzle game
+
+/result
+Final result
+
+GAME OVER STATE
+Can be displayed through /game or /result depending on architecture.
+
+ADMIN:
+
+/admin
+Admin authentication
+
+/admin/dashboard
+Admin control dashboard
+
+/admin/match
+Live match management
+
+/admin/results
+Results and leaderboard
+
+/admin/settings
+Event configuration
+
+When the participant opens the website, show:
+
+ENGINEERING DAY
+
+PUZZLE CHALLENGE
+
+A short subtitle:
+
+"Think. Arrange. Solve."
+
+Then:
+
+[ ENTER GAME ]
+
+Do not immediately ask for unnecessary information.
+
+When ENTER GAME is selected:
+
+Show the player setup screen.
+
+Ask:
+
+"Enter your name"
+
+Input:
+
+Name
+
+Requirements:
+
+Required
+Minimum 2 characters
+Maximum 24 characters
+Trim whitespace
+Reject empty names
+Prevent only-special-character names
+Allow normal Indian names
+Support spaces
+Support Tamil/Unicode names if desired
+Sanitize HTML
+Do not allow script injection
+
+Example:
+
+Name:
+[ Mathavan ]
+
+Continue button:
+
+[ CHOOSE AVATAR ]
+
+Provide a collection of cartoon animal avatars.
+
+Recommended initial 16:
+
+Fox
+Panda
+Tiger
+Lion
+Koala
+Penguin
+Rabbit
+Bear
+Monkey
+Frog
+Raccoon
+Elephant
+Giraffe
+Zebra
+Cat
+Dog
+
+Each avatar should have:
+
+Unique avatar ID
+Image
+Consistent dimensions
+Consistent illustration style
+Friendly expression
+Transparent or clean background
+
+Use the previously generated cartoon animal artwork as the visual reference.
+
+The animal avatars should have fun customization.
+
+Possible accessories:
+
+Cap
+Glasses
+Sunglasses
+Crown
+Hoodie
+Jacket
+Hat
+Bow
+Scarf
+Explorer hat
+Student-style accessories
+
+However, do not make the avatar selection complicated.
+
+The participant should be able to select an avatar quickly.
+
+Optionally provide:
+
+BASE ANIMAL
+
+
+
+
+ACCESSORY
+
+The system stores:
+
+animal_id
+
+accessory_id
+
+avatar configuration
+
+Example:
+
+animal:
+fox
+
+accessory:
+cap
+
+The rendered player avatar becomes:
+
+Fox + Cap
+
+When a player joins:
+
+Generate a secure unique player session ID.
+
+Do not use the player's name as the primary identifier.
+
+Use:
+
+player_id
+
+session_id
+
+match_id
+
+The name is only display information.
+
+This prevents:
+
+Duplicate names
+Player collision
+Overwriting another player
+Duplicate database rows
+
+The participant selects:
+
+[ JOIN GAME ]
+
+The backend must atomically determine whether the player can join.
+
+Do not perform:
+
+SELECT
+then
+INSERT
+
+as separate unprotected operations.
+
+Use a transaction or unique constraints.
+
+The backend must prevent:
+
+Double click
+Double tap
+Network retry duplication
+Browser refresh duplication
+Multiple requests arriving simultaneously
+
+If the same session sends multiple join requests, return the existing player record.
+
+The expected maximum is:
+
+40 players.
+
+Design the system for at least:
+
+50 simultaneous connected clients
+
+to provide safety margin.
+
+Recommended configured capacity:
+
+
+
+
+If 40 players are already joined:
+
+Show:
+
+"Game lobby is full."
+
+Do not allow player 41 to enter the match.
+
+However, the admin may configure the maximum capacity before starting.
+
+Possible values:
+
+10
+20
+30
+40
+50
+
+Default:
+
+
+
+
+After joining successfully, move the player to:
+
+MAIN LOBBY
+
+Show:
+
+ENGINEERING DAY
+PUZZLE CHALLENGE
+
+PLAYER COUNT
+
+Example:
+
+12 / 40 PLAYERS
+
+Then display all joined players.
+
+Each player card contains:
+
+Animal avatar
+Player name
+Optional player number
+
+Example:
+
+[FOX]
+Mathavan
+
+[PANDA]
+Vimal
+
+[TIGER]
+Thiru
+
+Do not expose unnecessary technical IDs.
+
+The lobby must update in real time.
+
+When a new player joins:
+
+All connected players should see the new player.
+
+When a player leaves:
+
+The player should disappear after the session is determined inactive.
+
+Do not require manual refresh.
+
+Use Supabase Realtime.
+
+Subscribe to match-specific player changes.
+
+Do not subscribe the entire application unnecessarily.
+
+Subscribe only to:
+
+current match
+
+current lobby
+
+current player state
+
+Implement player presence.
+
+Each active player should periodically update:
+
+last_seen_at
+
+Recommended heartbeat:
+
+every 10–15 seconds.
+
+Do not write excessively to the database.
+
+Use a lightweight presence mechanism where possible.
+
+If a player closes the browser:
+
+their session eventually becomes inactive.
+
+Do not immediately delete the player.
+
+Keep the record for match history.
+
+Mark:
+
+connection_status = disconnected
+
+when appropriate.
+
+If a participant refreshes the page:
+
+DO NOT create a second player.
+
+Restore their active session.
+
+Use a secure session token stored appropriately.
+
+The player should return to the correct state:
+
+LOBBY
+or
+ROUND 1
+or
+ROUND 2
+or
+RESULT
+
+depending on the authoritative server state.
+
+If network temporarily disappears:
+
+Show a small message:
+
+"Connection lost. Reconnecting..."
+
+Do not immediately end the game.
+
+Try reconnecting automatically.
+
+After successful reconnection:
+
+"Connected"
+
+Then restore the current game state from the server.
+
+Never calculate elapsed time using only the client's previous state.
+
+Create a separate admin area.
+
+The admin should not use the normal player flow.
+
+Admin login should be:
+
+Admin username/code:
+
+admin@123
+
+IMPORTANT:
+
+Treat this as the initial event admin access credential.
+
+Do NOT hardcode the secret directly inside client-side JavaScript.
+
+Store the actual authentication secret securely on the backend/environment.
+
+For a real deployment, provide a mechanism to change the admin credential.
+
+If this is only a college-event deployment, the initial credential may be configured as:
+
+admin@123
+
+but validation must occur server-side.
+
+Admin dashboard should contain:
+
+EVENT STATUS
+
+Players
+
+Match
+
+Round
+
+Timer
+
+Puzzle
+
+Results
+
+Controls
+
+Admin should immediately see:
+
+Players Joined
+Maximum Capacity
+Current Match Status
+Current Round
+Current Puzzle
+Connected Players
+Completed Players
+Players Remaining
+
+Example:
+
+PLAYERS
+
+27 / 40
+
+CONNECTED
+
+25
+
+ROUND
+
+1 / 2
+
+STATUS
+
+WAITING
+
+Use explicit match states.
+
+Recommended states:
+
+WAITING
+
+ROUND_1_READY
+
+ROUND_1_ACTIVE
+
+ROUND_1_FINISHED
+
+ROUND_2_READY
+
+ROUND_2_ACTIVE
+
+ROUND_2_FINISHED
+
+COMPLETED
+
+CANCELLED
+
+GAME_OVER
+
+Do not use vague boolean combinations such as:
+
+isStarted
+isRound1
+isRound2
+isFinished
+
+that can create contradictory states.
+
+Use a controlled state machine.
+
+Before starting:
+
+[ START MATCH ]
+
+Show confirmation:
+
+"Start the match for all joined players?"
+
+Buttons:
+
+[ CANCEL ]
+
+[ START MATCH ]
+
+Once confirmed:
+
+The backend performs one atomic state transition.
+
+WAITING
+
+→
+
+ROUND_1_ACTIVE
+
+Only one successful start operation is allowed.
+
+If the admin accidentally clicks twice:
+
+Only the first request succeeds.
+
+The second request returns:
+
+"Match has already started."
+
+Do not create a second round.
+
+When admin starts Round 1:
+
+The server writes:
+
+match status
+
+round number
+
+round start timestamp
+
+round end timestamp
+
+puzzle ID
+
+version number
+
+All clients listen for the state change.
+
+Every connected player transitions automatically.
+
+Do not send a simple:
+
+"start=true"
+
+event and rely on local timers.
+
+The server state is authoritative.
+
+After admin starts the match, optionally show:
+
+3
+
+2
+
+1
+
+GO
+
+The countdown should be based on a server timestamp.
+
+Example:
+
+countdown_start_at
+
+Players calculate display time from:
+
+server_time
+
+not from separate local button clicks.
+
+This prevents:
+
+Player A starts at 00:00
+Player B starts at 00:03
+
+because of network differences.
+
+Round 1 is:
+
+SIMPLE IMAGE PUZZLE
+
+The system displays an image.
+
+The image is split into multiple puzzle pieces.
+
+The pieces are shuffled.
+
+The player must rearrange them into the correct original order.
+
+The image can be generated or selected by the admin.
+
+The image should be suitable for Engineering Day.
+
+Examples:
+
+Engineering illustration
+Mechanical engineering scene
+Computer engineering
+Robotics
+Electronics
+Bridges
+Space technology
+Renewable energy
+AI
+Engineering laboratory
+Future technology
+
+Avoid inappropriate images.
+
+Avoid copyrighted characters.
+
+Prefer original or AI-generated images.
+
+The admin should be able to use Gemini AI to generate puzzle content.
+
+Admin interface:
+
+PUZZLE GENERATOR
+
+Topic:
+
+[ __________________ ]
+
+Difficulty:
+
+Round 1
+
+Image style:
+
+[ Engineering illustration ]
+
+Number of pieces:
+
+[ 9 ]
+
+Button:
+
+[ GENERATE PUZZLE ]
+
+Gemini should generate an original image or image-generation-ready prompt depending on the configured Gemini capabilities.
+
+The generated puzzle asset must be stored with:
+
+puzzle_id
+
+title
+
+description
+
+image_url
+
+difficulty
+
+piece_count
+
+correct_solution
+
+created_at
+
+created_by
+
+Admin enters:
+
+Topic:
+"Future of Robotics"
+
+Gemini assists in generating:
+
+Puzzle title
+Image concept
+Image prompt
+Difficulty
+Recommended piece count
+
+If image generation is available through the configured AI service:
+
+Generate the actual image.
+
+If the configured Gemini API does not provide image generation in the selected model/API:
+
+Do not pretend it generated an image.
+
+Instead generate a high-quality image prompt and allow the admin to upload/select an image.
+
+The UI must clearly distinguish:
+
+AI-generated
+
+from
+
+Admin-uploaded.
+
+Never compare the visual appearance using AI during gameplay.
+
+Puzzle correctness must be deterministic.
+
+When the puzzle is generated:
+
+Assign each piece a canonical index.
+
+Example for a 3x3 puzzle:
+
+0 1 2
+3 4 5
+6 7 8
+
+The shuffled state may be:
+
+4 0 8
+2 7 1
+6 3 5
+
+Correct state:
+
+0 1 2
+3 4 5
+6 7 8
+
+The server knows the correct order.
+
+Default:
+
+3 × 3
+
+9 pieces.
+
+Admin may configure:
+
+3 × 3
+4 × 4
+5 × 5
+
+Round 1 default:
+
+3 × 3
+
+Keep Round 1 relatively accessible.
+
+The player can:
+
+Drag pieces
+Drop pieces
+Tap one piece
+Tap another piece
+Swap pieces
+
+Touch interaction is mandatory.
+
+Do not rely only on HTML desktop drag-and-drop.
+
+Implement pointer/touch-friendly interactions.
+
+Use:
+
+pointerdown
+pointermove
+pointerup
+
+or a reliable touch-friendly library.
+
+The puzzle interaction must not create collisions.
+
+Only one active drag operation may exist for a player at a time.
+
+If a piece is already being dragged:
+
+Ignore additional drag attempts.
+
+When dropping:
+
+Validate target index.
+
+If invalid:
+
+Return piece to original location.
+
+Do not duplicate pieces.
+
+Do not lose pieces.
+
+Do not allow two pieces to occupy one logical slot.
+
+Use a deterministic array representing the board.
+
+Provide tap-to-swap as a reliable fallback.
+
+First tap:
+
+Piece selected.
+
+Second tap:
+
+Swap the two pieces.
+
+Example:
+
+"Select another piece to swap"
+
+Then automatically clear the selection.
+
+This is particularly important on mobile.
+
+When the player's board becomes:
+
+0 1 2
+3 4 5
+6 7 8
+
+the client may immediately display:
+
+"Puzzle Complete!"
+
+But the server must validate the submitted solution.
+
+Send:
+
+player_id
+
+match_id
+
+round_id
+
+puzzle_id
+
+solution_order
+
+client_timestamp
+
+request_id
+
+The server validates.
+
+Every completion request must contain:
+
+request_id
+
+Use a unique UUID.
+
+If the same request is received twice:
+
+Return the existing result.
+
+Do not award points twice.
+
+This protects against:
+
+Double tap
+Network retry
+Browser retry
+Connection problems
+
+Make scoring configurable by admin.
+
+Recommended default:
+
+Base completion score:
+100 points
+
+Time bonus:
+faster completion = higher bonus
+
+Move efficiency bonus:
+fewer moves = higher bonus
+
+Example formula:
+
+base_score = 100
+
+time_bonus =
+remaining_seconds × configured_multiplier
+
+efficiency_bonus =
+max(0, ideal_moves - actual_moves) × configured_multiplier
+
+Do not allow negative total score.
+
+Maximum and minimum values must be enforced server-side.
+
+Round 1 time should be configurable.
+
+Admin settings:
+
+Round 1 duration:
+for example 3 minutes
+
+Do not hardcode the duration throughout the frontend.
+
+Store:
+
+round_duration_seconds
+
+round_start_at
+
+round_end_at
+
+The server decides whether the player completed before the deadline.
+
+If time reaches zero:
+
+The puzzle becomes locked.
+
+The client must not accept further moves.
+
+The server rejects late completion requests.
+
+Show:
+
+TIME'S UP
+
+Then continue according to configured event rules.
+
+Default:
+
+Move the player to Round 2 if Round 1 has ended.
+
+After Round 1:
+
+Show a short transition screen:
+
+ROUND 1 COMPLETE
+
+Your score:
+
+XXX
+
+Then:
+
+ROUND 2
+
+HARD PUZZLE
+
+Do not allow the player to start Round 2 before the server has opened it.
+
+Round 2 is the hard level.
+
+It is intentionally more difficult.
+
+Recommended default:
+
+4 × 4
+
+16 pieces.
+
+The admin may configure:
+
+4 × 4
+5 × 5
+
+Recommended default:
+
+4 × 4.
+
+Round 2 has exactly:
+
+10 MINUTES
+
+Default:
+
+600 seconds.
+
+The server must store:
+
+round_2_start_at
+
+round_2_end_at
+
+The displayed countdown is derived from the server timestamps.
+
+Do NOT count down using:
+
+setInterval(() => seconds--)
+
+as the authoritative timer.
+
+The UI timer may refresh every second, but it must calculate:
+
+remaining =
+round_end_at - server_current_time
+
+When Round 2 reaches:
+
+00:00
+
+the game is over for players who have not completed it.
+
+The UI must immediately show:
+
+GAME OVER
+
+TIME'S UP
+
+The puzzle becomes disabled.
+
+No further moves.
+
+No further completion.
+
+The server rejects late submissions.
+
+This is extremely important.
+
+Suppose:
+
+Player submits at the exact moment the timer reaches zero.
+
+The server must decide based on authoritative timestamps.
+
+Rule:
+
+If completion is accepted before:
+
+round_end_at
+
+then it counts.
+
+If completion reaches the authoritative server after:
+
+round_end_at
+
+it does not count.
+
+Do not trust:
+
+phone clock
+
+client timestamp
+
+browser timer
+
+network display
+
+The server/database transaction determines the result.
+
+After Round 2:
+
+Show:
+
+PUZZLE CHALLENGE COMPLETE
+
+Player avatar
+
+Player name
+
+Round 1 score
+
+Round 2 score
+
+Total score
+
+Completion status
+
+Optional completion time
+
+Example:
+
+Mathavan
+
+Round 1
+120
+
+Round 2
+260
+
+TOTAL
+380
+
+Then:
+
+[ VIEW LEADERBOARD ]
+
+Leaderboard should show:
+
+Rank
+
+Avatar
+
+Player name
+
+Total score
+
+Status
+
+Example:
+
+1
+Fox
+Mathavan
+380
+
+2
+Panda
+Vimal
+350
+
+3
+Tiger
+Thiru
+320
+
+Sort server-side.
+
+Tie-breaking must be deterministic.
+
+Recommended tie-break:
+
+Total score descending
+Round 2 score descending
+Total completion time ascending
+Player ID ascending
+
+Do not use random tie-breaking.
+
+Admin can see a live leaderboard.
+
+Players may optionally see a final leaderboard only.
+
+Do not constantly expose every player's live score if that could affect the competition.
+
+Admin configuration:
+
+show_live_leaderboard = false
+
+default.
+
+Admin should see:
+
+MATCH STATUS
+
+Players:
+32 / 40
+
+Round:
+2
+
+Time remaining:
+08:42
+
+Completed:
+17
+
+Playing:
+15
+
+Disconnected:
+0
+
+Game Over:
+0
+
+Admin controls:
+
+[ PAUSE ]
+
+[ RESUME ]
+
+[ END MATCH ]
+
+[ VIEW RESULTS ]
+
+If implemented, pause must be server-authoritative.
+
+Do not pause only the admin screen.
+
+When paused:
+
+All player puzzle interactions are disabled.
+
+Timer stops according to server state.
+
+Show:
+
+GAME PAUSED
+
+Please wait...
+
+When resumed:
+
+The server calculates the new authoritative end time.
+
+Do not simply resume each client's local timer.
+
+Admin may manually end the match.
+
+Show confirmation:
+
+"End this match for all players?"
+
+If confirmed:
+
+match status:
+
+COMPLETED
+
+All players see:
+
+MATCH ENDED
+
+FINAL RESULTS
+
+Do not allow accidental ending.
+
+Require confirmation.
+
+Admin should see all players.
+
+Columns/cards:
+
+Player
+
+Avatar
+
+Connection
+
+Current round
+
+Status
+
+Score
+
+Completion
+
+Last seen
+
+Example:
+
+Mathavan
+Fox
+Connected
+Round 2
+Playing
+280
+
+Possible player statuses:
+
+JOINED
+
+READY
+
+PLAYING
+
+COMPLETED_ROUND_1
+
+PLAYING_ROUND_2
+
+COMPLETED
+
+TIME_UP
+
+DISCONNECTED
+
+ELIMINATED
+
+Do not use conflicting statuses.
+
+The backend controls valid transitions.
+
+Create tables similar to:
+
+events
+
+matches
+
+players
+
+player_sessions
+
+avatars
+
+puzzles
+
+rounds
+
+player_rounds
+
+puzzle_attempts
+
+scores
+
+admin_sessions
+
+system_logs
+
+Fields:
+
+id
+name
+description
+status
+max_players
+created_at
+updated_at
+
+Example:
+
+Engineering Day
+Puzzle Challenge
+
+Fields:
+
+id
+event_id
+status
+current_round
+max_players
+round_1_duration_seconds
+round_2_duration_seconds
+round_1_start_at
+round_1_end_at
+round_2_start_at
+round_2_end_at
+current_puzzle_id
+version
+created_at
+updated_at
+
+Use versioning to prevent stale updates.
+
+Fields:
+
+id
+match_id
+name
+animal_id
+accessory_id
+status
+connection_status
+joined_at
+last_seen_at
+completed_at
+
+Add unique constraints where appropriate.
+
+Do not make name unique.
+
+Two people may have the same name.
+
+Their player IDs remain different.
+
+Fields:
+
+id
+player_id
+session_token_hash
+created_at
+last_seen_at
+expires_at
+is_active
+
+Never store raw sensitive session secrets unnecessarily.
+
+Fields:
+
+id
+animal_name
+image_url
+active
+created_at
+
+Optional accessory relationship.
+
+Fields:
+
+id
+title
+description
+image_url
+difficulty
+grid_size
+piece_count
+solution_order
+source_type
+ai_generated
+created_by
+created_at
+
+solution_order must be stored securely.
+
+Do not expose unnecessary solution data to the client if it would allow cheating.
+
+Fields:
+
+id
+player_id
+match_id
+round_number
+puzzle_id
+status
+started_at
+completed_at
+completion_time_ms
+move_count
+score
+submission_request_id
+
+Unique:
+
+player_id + match_id + round_number
+
+This prevents duplicate round records.
+
+Record important attempts for audit/debugging.
+
+Fields:
+
+id
+player_id
+match_id
+round_number
+puzzle_id
+move_count
+submitted_order
+result
+created_at
+request_id
+
+Do not store huge amounts of unnecessary move history.
+
+The client must never directly write:
+
+score = 9999
+
+The client submits:
+
+solution
+
+The server calculates:
+
+score
+
+The server stores:
+
+score
+
+This prevents cheating.
+
+Enable PostgreSQL Row Level Security.
+
+Players should only be able to access data required for their match.
+
+Do not allow arbitrary player access to all matches.
+
+Do not allow one player to modify another player's score.
+
+Do not expose admin operations to anonymous users.
+
+Admin actions must use privileged server-side validation.
+
+Use match-specific channels.
+
+Example concept:
+
+match:{match_id}
+
+Events:
+
+PLAYER_JOINED
+
+PLAYER_UPDATED
+
+MATCH_STARTED
+
+ROUND_CHANGED
+
+MATCH_PAUSED
+
+MATCH_RESUMED
+
+MATCH_ENDED
+
+PLAYER_COMPLETED
+
+RESULT_UPDATED
+
+Do not broadcast sensitive solution data.
+
+Every match state should have a version.
+
+Example:
+
+version = 15
+
+When an admin performs an action:
+
+Expected version:
+15
+
+Server changes:
+
+version:
+16
+
+If another request already changed it:
+
+reject stale request.
+
+This prevents race conditions.
+
+Admin START MATCH must be atomic.
+
+Example logical rule:
+
+Only allow:
+
+status = WAITING
+
+→
+
+ROUND_1_ACTIVE
+
+If status is already:
+
+ROUND_1_ACTIVE
+
+return:
+
+"Match already started."
+
+Do not create another start.
+
+The admin may accidentally open two tabs.
+
+Both tabs must remain synchronized.
+
+If Admin Tab A starts the match:
+
+Admin Tab B must immediately see:
+
+MATCH STARTED
+
+and disable its Start button.
+
+If player double-taps:
+
+JOIN GAME
+
+only one player record should be created.
+
+The UI should also disable the button immediately.
+
+But the backend must provide the real protection.
+
+Never rely only on button disabling.
+
+If a player presses browser Back during the game:
+
+Do not destroy the session.
+
+When returning:
+
+restore the current authoritative game state.
+
+If the match has ended:
+
+show results.
+
+If player changes tabs:
+
+the game continues.
+
+The timer remains authoritative.
+
+When the player returns:
+
+calculate current remaining time from server state.
+
+Do not pause automatically unless admin has explicitly configured pause-on-background.
+
+Do not trust:
+
+client score
+
+client timer
+
+client completion timestamp
+
+client round number
+
+client match state
+
+client player ID
+
+Use server-side verification.
+
+The player may manipulate their own local JavaScript.
+
+Therefore the server must always validate important actions.
+
+Do not send the raw correct solution order in a publicly accessible API response.
+
+The client needs enough information to construct the puzzle, but the server should maintain authoritative validation information.
+
+Use appropriate architecture so a participant cannot simply inspect a public JSON object and obtain the answer.
+
+Do not upload 16 separate image files unless necessary.
+
+Prefer:
+
+one source image
+
+and deterministic CSS/canvas clipping.
+
+Each piece represents a canonical coordinate.
+
+Example:
+
+row = 0
+column = 0
+
+piece_id:
+
+0
+
+The frontend renders each piece from the source image using:
+
+background-position
+
+or canvas.
+
+Optimize images.
+
+Do not send huge original images unnecessarily.
+
+Use:
+
+WebP
+
+or optimized formats.
+
+Recommended target:
+
+mobile-friendly image.
+
+Ensure puzzle remains visually clear.
+
+Each puzzle should be shuffled deterministically.
+
+The server may generate:
+
+shuffle_seed
+
+The client uses the seed to reproduce the same initial layout.
+
+Alternatively, server may store the initial arrangement.
+
+The correct solution remains:
+
+canonical order.
+
+Do not randomize the correct order.
+
+Do not accidentally generate a puzzle that is already solved.
+
+After shuffling:
+
+verify:
+
+shuffled_order != solution_order
+
+For a 3x3 puzzle, ensure the starting arrangement is meaningfully shuffled.
+
+If using a traditional sliding puzzle, implement mathematical solvability checks.
+
+If using drag/swap puzzle pieces, solvability is always possible.
+
+Prefer drag-and-swap because it matches the event requirement and avoids unsolvable states.
+
+Show:
+
+Moves: 17
+
+Optional.
+
+Move count must be calculated consistently.
+
+One swap:
+
++1 move
+
+Do not count visual drag movements as multiple moves.
+
+Header:
+
+ROUND 1
+
+SIMPLE PUZZLE
+
+Timer
+
+Score information
+
+Puzzle area
+
+Controls
+
+Example:
+
+ROUND 1
+Simple Puzzle
+
+TIME
+02:14
+
+MOVES
+12
+
+[ PUZZLE ]
+
+[ RESET ] if allowed
+
+Do not provide a reset if it creates a scoring exploit unless clearly handled.
+
+Header:
+
+ROUND 2
+
+HARD PUZZLE
+
+Timer should be prominent.
+
+Example:
+
+ROUND 2
+Hard Puzzle
+
+09:42
+
+Moves: 24
+
+[ PUZZLE ]
+
+Use visual urgency only when time is low.
+
+Do not make the screen stressful.
+
+Timer states:
+
+Normal
+
+Warning
+
+Critical
+
+For example:
+
+Above 2 minutes:
+normal
+
+Below 60 seconds:
+warning
+
+Below 15 seconds:
+critical
+
+Use subtle animation.
+
+Do not use flashing effects that could distract users.
+
+When Round 2 reaches zero:
+
+Show:
+
+GAME OVER
+
+TIME'S UP
+
+Your puzzle was not completed within 10 minutes.
+
+Then show:
+
+Round 1 Score
+
+Round 2 Score
+
+Total Score
+
+Button:
+
+[ VIEW RESULT ]
+
+No further puzzle interaction.
+
+If the player completes Round 2:
+
+Show:
+
+PUZZLE SOLVED!
+
+Excellent work.
+
+Then:
+
+Your final score:
+
+XXX
+
+Show:
+
+Round 1
+XXX
+
+Round 2
+XXX
+
+Total
+XXX
+
+Then:
+
+[ VIEW LEADERBOARD ]
+
+The application should feel calm.
+
+Use:
+
+soft transitions
+
+subtle card animations
+
+smooth puzzle movement
+
+clear typography
+
+minimal visual noise
+
+Do not add:
+
+confetti everywhere
+
+loud effects
+
+rapid flashing
+
+overly aggressive countdowns
+
+The event is educational.
+
+Keep it professional.
+
+Optional subtle sounds:
+
+Piece placed
+
+Puzzle completed
+
+Round started
+
+Time warning
+
+Game over
+
+Provide a mute button.
+
+Sound must be disabled by default if browser autoplay restrictions require user interaction.
+
+Do not depend on sound for important information.
+
+Provide:
+
+high contrast
+
+large tap targets
+
+keyboard support on desktop
+
+visible focus state
+
+ARIA labels
+
+accessible buttons
+
+alt text
+
+Do not communicate critical information only through color.
+
+Admin dashboard should include:
+
+CREATE PUZZLE
+
+Fields:
+
+Title
+
+Topic
+
+Difficulty
+
+Round
+
+Grid size
+
+Time
+
+Image source
+
+AI generation option
+
+Button:
+
+GENERATE WITH GEMINI
+
+Gemini should generate structured puzzle metadata.
+
+Example output concept:
+
+{
+title,
+theme,
+image_prompt,
+difficulty,
+recommended_grid_size,
+educational_context
+}
+
+Validate Gemini output using a strict schema.
+
+Never blindly trust arbitrary AI output.
+
+If Gemini fails:
+
+Do not break the application.
+
+Show:
+
+"AI generation is temporarily unavailable."
+
+Allow:
+
+[ TRY AGAIN ]
+
+and:
+
+[ UPLOAD IMAGE ]
+
+The admin should still be able to create a puzzle manually.
+
+Admin can upload an image.
+
+Validate:
+
+file type
+
+file size
+
+dimensions
+
+Upload safely.
+
+Recommended supported formats:
+
+PNG
+
+JPG
+
+WEBP
+
+Reject unsupported files.
+
+Do not allow executable files.
+
+Before publishing:
+
+Admin sees:
+
+Image preview
+
+Grid preview
+
+Difficulty
+
+Round
+
+Number of pieces
+
+Estimated solve time
+
+Button:
+
+[ SAVE PUZZLE ]
+
+Button:
+
+[ CANCEL ]
+
+A puzzle must have status:
+
+DRAFT
+
+PUBLISHED
+
+ARCHIVED
+
+Only published puzzles can be assigned to an active match.
+
+Before starting:
+
+Admin selects:
+
+Round 1 puzzle
+
+Round 1 duration
+
+Round 2 puzzle
+
+Round 2 duration
+
+Default Round 2:
+
+10 minutes
+
+Maximum players:
+
+40
+
+Before Start Match:
+
+Check:
+
+At least 1 player
+
+Round 1 puzzle exists
+
+Round 2 puzzle exists
+
+Puzzles are published
+
+Durations are valid
+
+Admin is authenticated
+
+Match status is WAITING
+
+If anything is missing:
+
+do not start.
+
+Show exact problem.
+
+Display:
+
+Engineering Day
+Puzzle Challenge
+
+Players:
+32 / 40
+
+Round 1:
+Simple Image Puzzle
+
+Round 2:
+Hard Image Puzzle
+
+Round 2:
+10:00
+
+Then:
+
+[ START MATCH ]
+
+Provide:
+
+[ RESET LOBBY ]
+
+only before the match starts.
+
+Require confirmation.
+
+Reset should:
+
+invalidate active player sessions for that match
+
+clear active lobby
+
+preserve historical match records if needed
+
+Do not silently delete event history.
+
+Do not automatically create unlimited matches.
+
+Admin can:
+
+Create Match
+
+Assign event
+
+Configure settings
+
+Open lobby
+
+Start match
+
+Complete match
+
+Archive match
+
+The player landing page should find the currently open public match.
+
+If no active match:
+
+show:
+
+"No puzzle challenge is currently open."
+
+Admin can create/open a match.
+
+Optionally support an event code.
+
+Example:
+
+ENGDAY26
+
+If enabled:
+
+Player enters:
+
+ENGDAY26
+
+Then enters name and avatar.
+
+This prevents unrelated people from joining.
+
+Make this configurable.
+
+OPEN WEBSITE
+
+↓
+
+ENTER EVENT CODE
+
+↓
+
+ENTER NAME
+
+↓
+
+SELECT AVATAR
+
+↓
+
+JOIN
+
+↓
+
+LOBBY
+
+Create a polished lobby.
+
+Top:
+
+ENGINEERING DAY
+
+PUZZLE CHALLENGE
+
+Center:
+
+[ Large animated subtle illustration ]
+
+Text:
+
+"Waiting for the challenge to begin"
+
+Player count:
+
+27 / 40
+
+Player grid:
+
+avatar + name
+
+Bottom:
+
+"You are ready."
+
+Do not show admin credentials.
+
+When a player joins:
+
+Subtle notification:
+
+"Vimal joined the lobby"
+
+Do not spam every player.
+
+Use a short toast.
+
+Optionally show:
+
+READY
+
+All players are automatically considered ready once joined.
+
+Do not require another button unless needed.
+
+This simplifies the event.
+
+Admin may start even if only a few players are present.
+
+Minimum default:
+
+1
+
+Recommended event setting:
+
+minimum_players = 1
+
+Admin decides when enough participants have joined.
+
+Once started:
+
+New players cannot join Round 1.
+
+Show:
+
+"Match already started."
+
+This prevents late joiners from having incomplete game state.
+
+If desired, admin can enable:
+
+late_joining = false
+
+Default:
+
+false.
+
+If enabled, late players may join only before Round 2 according to explicit rules.
+
+Do not implement ambiguous late joining.
+
+If player disconnects:
+
+Their game state remains stored.
+
+When they reconnect:
+
+Restore their board state if the round is still active.
+
+Their score remains intact.
+
+If the round ended while disconnected:
+
+move them to the appropriate next state.
+
+For active gameplay, periodically synchronize important state.
+
+Do not write every mouse movement to the database.
+
+Recommended:
+
+local UI state during movement
+
+server synchronization at meaningful intervals or completion
+
+At minimum, store final valid completion.
+
+If recovery from refresh is required, persist board state periodically using throttling.
+
+Every saved board state may have:
+
+board_version
+
+Example:
+
+1
+
+2
+
+3
+
+When updating:
+
+only accept newer versions.
+
+This prevents an old network request from overwriting a newer board.
+
+Important player actions require:
+
+request_id
+
+Examples:
+
+join
+
+complete puzzle
+
+start match
+
+pause
+
+resume
+
+end match
+
+Use server-side idempotency.
+
+Every important API request must have:
+
+loading state
+
+success state
+
+failure state
+
+retry option
+
+Do not show raw database errors to users.
+
+Bad:
+
+"PostgrestException 23505"
+
+Good:
+
+"This player session is already active."
+
+If connection fails during gameplay:
+
+Show small banner:
+
+Connection issue
+Reconnecting...
+
+Do not destroy the puzzle.
+
+When connection returns:
+
+Synchronize with server.
+
+If a database request fails:
+
+Log the technical error server-side.
+
+Show user-friendly message.
+
+Retry only when safe.
+
+Do not blindly retry mutation requests without idempotency.
+
+If Gemini returns malformed output:
+
+Reject it.
+
+Do not save invalid puzzle data.
+
+Show:
+
+"AI returned an invalid puzzle configuration. Please try again."
+
+If puzzle image fails to load:
+
+Show:
+
+"Puzzle image could not be loaded."
+
+Provide:
+
+[ RETRY ]
+
+Do not start a puzzle that cannot display correctly.
+
+On every page load:
+
+Identify active player session.
+Fetch match.
+Fetch authoritative state.
+Determine current route.
+Render correct screen.
+
+Never decide the game stage solely from localStorage.
+
+The client needs a server-time reference.
+
+Use:
+
+server_now
+
+and timestamp synchronization.
+
+The UI can calculate:
+
+remaining_ms =
+server_end_at - estimated_server_now
+
+The server remains authoritative for final validation.
+
+Do not trust device clock.
+
+A participant could manually change their phone time.
+
+The server/database timestamp determines the actual game deadline.
+
+Create a server-side score function.
+
+Inputs:
+
+round
+
+puzzle
+
+completion_time
+
+move_count
+
+difficulty
+
+configuration
+
+Output:
+
+score
+
+Validate:
+
+score >= 0
+
+score <= configured maximum
+
+Prevent overflow.
+
+Once a player's round score is finalized:
+
+Do not allow normal client updates.
+
+If admin needs to correct a score:
+
+use an explicit admin correction action.
+
+Record:
+
+old score
+
+new score
+
+reason
+
+admin
+
+timestamp
+
+Store important admin actions:
+
+match_created
+
+puzzle_created
+
+puzzle_published
+
+match_started
+
+round_started
+
+match_paused
+
+match_resumed
+
+match_ended
+
+score_corrected
+
+match_reset
+
+This helps during a live college event if something goes wrong.
+
+Admin routes must be protected.
+
+A player must never be able to access admin operations simply by changing the URL.
+
+Do not rely only on:
+
+if (isAdmin)
+
+in frontend state.
+
+Validate admin authorization on backend requests.
+
+Clean screen:
+
+ENGINEERING DAY
+
+ADMIN CONTROL
+
+Admin access code:
+
+[ ******** ]
+
+[ ENTER ADMIN PANEL ]
+
+Do not display the actual code in the interface.
+
+If the initial configured code is:
+
+admin@123
+
+it should be entered by the organizer.
+
+After authentication:
+
+create a secure admin session.
+
+Use an expiration policy.
+
+Provide:
+
+[ LOG OUT ]
+
+Do not keep admin access permanently active.
+
+Dashboard navigation:
+
+Overview
+
+Lobby
+
+Match
+
+Puzzle Generator
+
+Puzzle Library
+
+Leaderboard
+
+Settings
+
+Logs
+
+Show:
+
+Current Event
+
+Active Match
+
+Players
+
+Current Round
+
+Time
+
+Completed
+
+Disconnected
+
+Total Score
+
+Show:
+
+player cards
+
+search
+
+connection status
+
+joined time
+
+remove player before match starts
+
+Do not allow removing players after match start unless explicitly supported.
+
+Before match:
+
+Admin may remove a participant.
+
+Require confirmation.
+
+The removed player's session becomes:
+
+REMOVED
+
+If they try to reconnect:
+
+show:
+
+"You have been removed from this lobby."
+
+Admin can search by:
+
+name
+
+player ID
+
+status
+
+Do not expose unnecessary private data.
+
+Provide optional:
+
+Export Results
+
+CSV
+
+Fields:
+
+Rank
+Player Name
+Animal
+Round 1 Score
+Round 2 Score
+Total Score
+Completion Status
+Completion Time
+
+Do not expose session secrets.
+
+When match ends:
+
+show top players.
+
+Use a professional Engineering Day design.
+
+Example:
+
+ENGINEERING DAY
+PUZZLE CHALLENGE
+
+FINAL RESULTS
+
+1
+FOX
+MATHAVAN
+380
+
+2
+PANDA
+VIMAL
+350
+
+3
+TIGER
+THIRU
+320
+
+If desired:
+
+Top 3
+
+Winner
+
+Runner-up
+
+Third place
+
+Do not overuse animations.
+
+Keep it professional.
+
+Create indexes for frequently accessed fields:
+
+players.match_id
+
+players.status
+
+players.last_seen_at
+
+player_rounds.match_id
+
+player_rounds.player_id
+
+player_rounds.round_number
+
+scores.match_id
+
+puzzles.status
+
+matches.status
+
+matches.event_id
+
+Design for:
+
+40 players
+
+1 admin
+
+possibly 2–3 admin tabs
+
+many simultaneous submissions.
+
+The system must remain consistent if:
+
+10 players finish simultaneously.
+
+All 40 players submit near the same time.
+
+Admin starts the match while clients reconnect.
+
+Two players choose the same name.
+
+A player double-submits.
+
+Admin double-clicks Start.
+
+Use transactions for operations that modify multiple related records.
+
+Examples:
+
+starting match
+
+ending round
+
+completing puzzle
+
+finalizing score
+
+resetting lobby
+
+Do not perform multi-step mutations without considering rollback.
+
+Recommended constraints:
+
+player_rounds:
+unique(player_id, match_id, round_number)
+
+completion:
+unique(player_id, match_id, round_number)
+
+request id:
+unique(request_id) where appropriate
+
+Do not use player name as a unique field.
+
+Protect endpoints from accidental or malicious excessive requests.
+
+Rate limit:
+
+join
+
+heartbeat
+
+completion
+
+admin actions
+
+Gemini generation
+
+Do not make heartbeat so aggressive that 40 users create unnecessary database load.
+
+Admin may accidentally click:
+
+Generate
+
+multiple times.
+
+Disable button while generating.
+
+Backend should also prevent duplicate generation requests.
+
+Use:
+
+generation_request_id
+
+Use CDN/storage caching.
+
+Do not repeatedly download the same puzzle image.
+
+The puzzle image should be shared across players.
+
+This significantly reduces bandwidth when 40 players use the same puzzle.
+
+Target:
+
+fast initial page load
+
+small JavaScript bundles
+
+optimized images
+
+lazy loading
+
+minimal database calls
+
+efficient realtime subscriptions
+
+Do not query all historical matches for the player lobby.
+
+For 40 players:
+
+Use a single match-specific player query.
+
+Subscribe to changes.
+
+Do not poll every second.
+
+Do not call the database once per player card.
+
+Do not make 40 database calls every second.
+
+The timer must run locally from synchronized server time.
+
+Database is used for authoritative state, not per-second timer writes.
+
+Do not re-render all pieces unnecessarily.
+
+Use stable React keys.
+
+Use efficient board state.
+
+Animations must remain smooth.
+
+Clean up:
+
+Realtime subscriptions
+
+timers
+
+event listeners
+
+pointer listeners
+
+when components unmount.
+
+Prevent duplicate subscriptions after navigation.
+
+When leaving lobby:
+
+unsubscribe from lobby-only channels if no longer needed.
+
+When entering game:
+
+subscribe to match state.
+
+Do not create multiple duplicate subscriptions after refresh/navigation.
+
+Prevent accidental page zoom during puzzle interactions where appropriate.
+
+Do not prevent accessibility zoom globally.
+
+Use:
+
+touch-action
+
+appropriately for puzzle area.
+
+Avoid browser scrolling while dragging a puzzle piece.
+
+Use responsive square board.
+
+Desktop:
+
+large square
+
+Mobile:
+
+width approximately:
+
+min(92vw, 420px)
+
+The puzzle should remain square.
+
+Pieces must have visible boundaries.
+
+Do not leave confusing gaps.
+
+Each piece should have:
+
+subtle border
+
+small shadow
+
+smooth movement
+
+selected state
+
+drag state
+
+correct placement feedback
+
+Do not use distracting effects.
+
+Do not automatically lock each piece unless the game design specifically requires it.
+
+Default:
+
+pieces remain movable until the complete arrangement is correct.
+
+When the server confirms completion:
+
+Puzzle pieces gently snap together.
+
+Show:
+
+PUZZLE COMPLETE
+
+Then score.
+
+Do not show the answer before server validation.
+
+Round 2 should be harder through:
+
+more pieces
+
+more complex image
+
+less obvious boundaries
+
+higher visual complexity
+
+not through unfair mechanics.
+
+Recommended:
+
+16 pieces.
+
+Admin may configure:
+
+grid size
+
+duration
+
+score multiplier
+
+time bonus
+
+move bonus
+
+puzzle image
+
+Use:
+
+Maximum players:
+40
+
+Round 1:
+Simple
+
+Grid:
+3 × 3
+
+Round 1 duration:
+Admin configurable
+
+Round 2:
+Hard
+
+Grid:
+4 × 4
+
+Round 2 duration:
+600 seconds
+
+Players cannot join after match start.
+
+Admin settings:
+
+Event name
+
+Event subtitle
+
+Maximum players
+
+Match code
+
+Round 1 duration
+
+Round 2 duration
+
+Round 1 grid
+
+Round 2 grid
+
+Scoring
+
+Leaderboard visibility
+
+Sound
+
+Late joining
+
+Prevent invalid values.
+
+Example:
+
+max players:
+1–100
+
+round duration:
+minimum 30 seconds
+
+round 2:
+minimum 60 seconds
+
+grid:
+3, 4, 5
+
+Do not allow:
+
+negative values
+
+NaN
+
+undefined
+
+extremely large durations
+
+The admin dashboard may be desktop optimized because the organizer may use a laptop.
+
+Still make it responsive.
+
+Prioritize:
+
+quick controls
+
+large status indicators
+
+clear warnings
+
+minimal clicks
+
+When players complete:
+
+"Mathavan completed Round 2."
+
+When many complete:
+
+"10 players completed Round 2."
+
+Do not create an overwhelming stream.
+
+Use a compact activity feed.
+
+Admin sees authoritative:
+
+ROUND 2
+08:32
+
+It should match player timers within normal network/display differences.
+
+The underlying deadline is the same.
+
+Implement explicit transitions:
+
+WAITING
+→ ROUND_1_ACTIVE
+→ ROUND_1_FINISHED
+→ ROUND_2_ACTIVE
+→ ROUND_2_FINISHED
+→ COMPLETED
+
+Invalid transitions must be rejected.
+
+Examples:
+
+WAITING → ROUND_2_ACTIVE
+
+not allowed.
+
+ROUND_1_ACTIVE → WAITING
+
+not allowed.
+
+COMPLETED → ROUND_1_ACTIVE
+
+not allowed.
+
+When all players finish Round 1 before the configured time:
+
+Admin may optionally advance early.
+
+Default behavior:
+
+Round 1 ends when timer expires.
+
+Admin may choose:
+
+[ END ROUND EARLY ]
+
+if configured.
+
+At Round 1 end:
+
+Server changes:
+
+ROUND_1_ACTIVE
+
+→
+
+ROUND_1_FINISHED
+
+Then:
+
+ROUND_2_ACTIVE
+
+with:
+
+round_2_start_at
+
+and:
+
+round_2_end_at = start + 600 seconds
+
+Players automatically move.
+
+Players can complete independently.
+
+Do not stop the entire match when one player finishes.
+
+Each player continues until:
+
+completed
+
+or
+
+time expired.
+
+The 10-minute Round 2 timer is the match round timer.
+
+It must be the same authoritative deadline for all players.
+
+Do not give each player a separate 10-minute timer based on when they open Round 2 unless the admin explicitly chooses an individual-timer mode.
+
+Default:
+
+shared round timer.
+
+Store final score permanently for the match.
+
+Do not recalculate historical results from current configuration after the event.
+
+Save the final awarded score.
+
+Admin can view completed matches.
+
+Show:
+
+date
+
+player count
+
+winner
+
+average score
+
+highest score
+
+completion rate
+
+Admin dashboard may show:
+
+Players joined
+
+Players completed Round 1
+
+Players completed Round 2
+
+Round 1 completion rate
+
+Round 2 completion rate
+
+Average Round 1 time
+
+Average Round 2 time
+
+Highest score
+
+Lowest score
+
+Average score
+
+Only collect what the game needs.
+
+Player:
+
+name
+
+avatar
+
+session
+
+game data
+
+Do not ask for:
+
+phone number
+
+email
+
+address
+
+date of birth
+
+unnecessary personal information
+
+Do not publicly display technical identifiers.
+
+Do not expose admin credentials.
+
+Do not expose database credentials.
+
+Do not expose Gemini API key.
+
+Where supported, configure appropriate:
+
+Content Security Policy
+
+X-Content-Type-Options
+
+Referrer Policy
+
+Frame restrictions
+
+HTTPS
+
+Secure cookies if applicable
+
+Sanitize all admin and player text.
+
+Never inject raw HTML from:
+
+player names
+
+AI output
+
+puzzle titles
+
+descriptions
+
+Gemini-generated text must be treated as untrusted input.
+
+Validate against schema.
+
+Strip unexpected fields.
+
+Limit text length.
+
+Do not execute any AI-generated code.
+
+The event's initial admin credential is:
+
+admin@123
+
+However:
+
+DO NOT put:
+
+const ADMIN_CODE = "admin@123"
+
+inside frontend JavaScript.
+
+Instead:
+
+Use a server-side environment variable or secure authentication configuration.
+
+Example concept:
+
+ADMIN_INITIAL_CODE
+
+The backend validates it.
+
+After deployment, the organizer can replace it.
+
+Provide a clearly separated development/demo mode.
+
+Never mix:
+
+demo state
+
+production state.
+
+Demo mode can simulate users locally only during development.
+
+Production must use real backend state.
+
+Do not display:
+
+John
+Alex
+Test User
+Player 1
+
+as fake players in the real lobby.
+
+If there are no players:
+
+show:
+
+"No players have joined yet."
+
+Every score displayed in production must come from real match data.
+
+Every game timer must derive from authoritative match timestamps.
+
+Admin status must come from authenticated server-side state.
+
+Create:
+
+.env.example
+
+with placeholders such as:
+
+VITE_SUPABASE_URL=
+
+VITE_SUPABASE_ANON_KEY=
+
+GEMINI_API_KEY=
+
+ADMIN_INITIAL_CODE=
+
+Never commit actual secrets.
+
+Create SQL migration files.
+
+Include:
+
+tables
+
+indexes
+
+constraints
+
+RLS policies
+
+functions
+
+triggers if needed
+
+seed avatar metadata
+
+Use triggers only where appropriate.
+
+Good use:
+
+updated_at
+
+audit logging
+
+Do not create overly complicated trigger chains.
+
+Keep the system understandable.
+
+Create clear backend functions such as:
+
+createMatch
+
+joinMatch
+
+getCurrentMatch
+
+startMatch
+
+getMatchState
+
+submitPuzzle
+
+completeRound
+
+advanceRound
+
+endMatch
+
+generatePuzzle
+
+publishPuzzle
+
+adminLogin
+
+getAdminDashboard
+
+exportResults
+
+Input:
+
+match_id
+
+name
+
+animal_id
+
+accessory_id
+
+session/request ID
+
+Output:
+
+player_id
+
+session
+
+match state
+
+player state
+
+Use validation.
+
+Input:
+
+match_id
+
+admin session
+
+expected_version
+
+Output:
+
+success
+
+new_version
+
+round state
+
+puzzle
+
+timestamps
+
+Input:
+
+match_id
+
+player_id
+
+round_number
+
+puzzle_id
+
+solution_order
+
+move_count
+
+request_id
+
+Output:
+
+accepted
+
+score
+
+completion_time
+
+next_state
+
+Server verifies:
+
+player belongs to match
+
+player is allowed to play round
+
+round is active
+
+puzzle matches assigned puzzle
+
+deadline not passed
+
+solution has correct number of pieces
+
+piece IDs are valid
+
+no duplicates
+
+no missing pieces
+
+solution matches canonical order
+
+request has not already been processed
+
+If solution is wrong:
+
+Do not award score.
+
+Return:
+
+correct: false
+
+The player may continue solving.
+
+Do not reveal the correct answer.
+
+If correct:
+
+Atomically:
+
+mark player round complete
+
+calculate score
+
+store score
+
+mark completion
+
+return result
+
+Do not allow second completion.
+
+If two identical completion requests arrive:
+
+Request A
+Request B
+
+Only one should create the completion.
+
+Request B should receive the existing completion result.
+
+Never award twice.
+
+If:
+
+Admin clicks Start twice
+
+Request A:
+WAITING → ROUND_1_ACTIVE
+
+Request B:
+WAITING → ?
+
+Request B must fail because state is no longer WAITING.
+
+No duplicate round.
+
+Test:
+
+40 players all submit at nearly the same time.
+
+Expected:
+
+40 valid results
+
+No lost scores
+
+No duplicate scores
+
+No overwritten players
+
+No database deadlocks that break the event
+
+Test:
+
+Players 1–40 join rapidly.
+
+Expected:
+
+40 unique player records.
+
+Player 41:
+
+rejected.
+
+Send multiple join requests for one session.
+
+Expected:
+
+one player.
+
+Player joins.
+
+Refreshes.
+
+Expected:
+
+same player session.
+
+No duplicate.
+
+Player disconnects for 20 seconds.
+
+Reconnects.
+
+Expected:
+
+game state restored.
+
+Round 2 starts.
+
+Different devices have different system clocks.
+
+Expected:
+
+same authoritative deadline.
+
+Timer reaches zero.
+
+Expected:
+
+game locks.
+
+Late completion rejected.
+
+Game Over displayed.
+
+Submit around deadline.
+
+Expected:
+
+server timestamp determines result.
+
+Admin refreshes dashboard during Round 2.
+
+Expected:
+
+current match state restored.
+
+Timer restored.
+
+Player count restored.
+
+Open admin dashboard in two tabs.
+
+Start match in Tab A.
+
+Tab B updates automatically.
+
+Disconnect player Wi-Fi temporarily.
+
+Expected:
+
+reconnect banner.
+
+Game does not corrupt.
+
+Disable Gemini API.
+
+Admin clicks generate.
+
+Expected:
+
+friendly error.
+
+No broken dashboard.
+
+Manual upload remains available.
+
+Break image URL.
+
+Expected:
+
+fallback UI.
+
+No blank infinite loading screen.
+
+Test:
+
+320px
+
+360px
+
+375px
+
+390px
+
+414px
+
+430px
+
+480px
+
+No horizontal overflow.
+
+Test:
+
+Chrome Android
+
+Safari iPhone
+
+Chrome desktop
+
+Edge desktop
+
+Firefox desktop
+
+Test keyboard navigation.
+
+Test focus.
+
+Test screen-reader labels.
+
+Test color contrast.
+
+Attempt:
+
+player accessing admin
+
+player modifying score
+
+player submitting another player's result
+
+player changing match ID
+
+player changing round number
+
+player changing puzzle ID
+
+player changing timer
+
+player sending duplicate request
+
+All must fail safely.
+
+Never trust frontend values.
+
+Validate all request bodies.
+
+Use schemas.
+
+Reject unexpected invalid values.
+
+Create structured server logs.
+
+Include:
+
+request ID
+
+operation
+
+match ID
+
+player ID where appropriate
+
+error category
+
+timestamp
+
+Do not log:
+
+passwords
+
+admin codes
+
+session secrets
+
+API keys
+
+Use React error boundaries.
+
+If a component crashes:
+
+show:
+
+"Something went wrong."
+
+Button:
+
+[ RELOAD GAME ]
+
+Do not show a blank screen.
+
+Every important screen needs a loading state.
+
+Example:
+
+Joining game...
+
+Generating puzzle...
+
+Loading match...
+
+Submitting...
+
+Do not allow duplicate actions while loading.
+
+Detect:
+
+navigator.onLine
+
+but do not use it as the authoritative connection state.
+
+Show:
+
+Offline
+
+Reconnecting
+
+Connected
+
+Use subtle toast notifications.
+
+Examples:
+
+"You joined the lobby."
+
+"Puzzle completed."
+
+"Reconnected."
+
+"Match has started."
+
+"Time is up."
+
+Avoid excessive notifications.
+
+Do not allow player to accidentally leave active gameplay through internal navigation.
+
+Provide a safe:
+
+Exit Game
+
+only when appropriate.
+
+Before leaving:
+
+confirm if necessary.
+
+Require confirmation for:
+
+Start match
+
+Reset lobby
+
+End match
+
+Delete puzzle
+
+Archive match
+
+Admin can see:
+
+Puzzle title
+
+Difficulty
+
+Grid
+
+Round
+
+Created by
+
+AI generated
+
+Status
+
+Created date
+
+Actions:
+
+Preview
+
+Edit
+
+Publish
+
+Archive
+
+Allow admin to duplicate an existing puzzle configuration if useful.
+
+Create a new puzzle ID.
+
+Never mutate historical puzzle data used by completed matches.
+
+Once a match is completed:
+
+do not change:
+
+assigned puzzle
+
+player score
+
+completion time
+
+final status
+
+unless an explicit audited admin correction occurs.
+
+Make the header:
+
+ENGINEERING DAY
+
+and:
+
+PUZZLE CHALLENGE
+
+prominent.
+
+Optional tagline:
+
+THINK. ARRANGE. SOLVE.
+
+Do not overcrowd the page with college branding unless the admin uploads a logo.
+
+Allow admin to upload an optional college/event logo.
+
+Store safely.
+
+Show on:
+
+welcome
+
+lobby
+
+admin
+
+results
+
+Use consistent circular avatar cards.
+
+Selected avatar:
+
+clear border
+
+subtle glow/shadow
+
+check indicator
+
+Do not rely only on color.
+
+Multiple players may choose the same animal.
+
+Do not restrict avatar selection.
+
+The player identity is:
+
+player_id
+
+not avatar.
+
+Multiple players may use:
+
+Arun
+
+This is allowed.
+
+Display an internal unique number if admin needs to distinguish them.
+
+Do not force users to create weird usernames.
+
+Optionally assign:
+
+P001
+
+P002
+
+P003
+
+...
+
+This is for admin/event identification.
+
+Do not use it as authentication.
+
+For 40 players:
+
+use responsive grid.
+
+Mobile:
+
+2 columns
+
+Tablet:
+
+3–4
+
+Desktop:
+
+4–6
+
+Keep cards compact.
+
+Player card:
+
+avatar
+
+name
+
+optional status
+
+Example:
+
+[FOX]
+
+Mathavan
+
+READY
+
+If no players:
+
+"Be the first to join."
+
+Then:
+
+"Waiting for participants..."
+
+At 40/40:
+
+"Lobby Full"
+
+Disable Join.
+
+Admin can still start.
+
+When started:
+
+All players receive real-time state update.
+
+If a player misses the realtime event:
+
+their next state fetch still detects:
+
+ROUND_1_ACTIVE
+
+Therefore they cannot get stuck forever.
+
+Realtime is for immediate updates.
+
+Database is the source of truth.
+
+If realtime disconnects:
+
+client periodically verifies state at a reasonable interval.
+
+Do not hammer the database.
+
+When receiving a real-time event:
+
+compare:
+
+event version
+
+current local version
+
+If event is older:
+
+ignore.
+
+If newer:
+
+apply.
+
+If a gap is detected:
+
+fetch authoritative match state.
+
+Local:
+
+version 10
+
+Event:
+
+version 12
+
+Fetch current state.
+
+Do not blindly assume version 11 was received.
+
+Use versioning where player-specific gameplay updates can race.
+
+Admin actions must use optimistic concurrency control.
+
+Critical requirement:
+
+Player A must never modify Player B.
+
+Player A must never receive Player B's private session.
+
+Player A must never receive admin-only secrets.
+
+Admin A and Admin B must not corrupt match state.
+
+Two completion requests must not double-award score.
+
+Two joins must not duplicate player.
+
+Two starts must not create two rounds.
+
+The application should look like a professionally designed university event platform.
+
+Not:
+
+a basic HTML quiz.
+
+Not:
+
+a template dashboard.
+
+Not:
+
+a toy project.
+
+It should feel:
+
+smooth
+
+clean
+
+modern
+
+stable
+
+fast
+
+friendly
+
+competitive
+
+professional.
+
+Create reusable components such as:
+
+AppShell
+
+EventHeader
+
+PlayerSetup
+
+AvatarSelector
+
+AvatarCard
+
+Lobby
+
+PlayerCard
+
+LobbyPlayerGrid
+
+Countdown
+
+PuzzleBoard
+
+PuzzlePiece
+
+ScoreCard
+
+GameStatus
+
+ResultCard
+
+Leaderboard
+
+AdminSidebar
+
+AdminHeader
+
+PlayerMonitor
+
+MatchControl
+
+PuzzleGenerator
+
+PuzzlePreview
+
+PuzzleLibrary
+
+ConfirmationModal
+
+Toast
+
+ConnectionStatus
+
+Use a clean state architecture.
+
+Separate:
+
+server state
+
+UI state
+
+gameplay state
+
+session state
+
+Do not put everything into one giant React state object.
+
+Use a reliable server-state approach.
+
+TypeScript must use strict typing.
+
+Do not use:
+
+any
+
+everywhere.
+
+Define types:
+
+Player
+
+Match
+
+Round
+
+Puzzle
+
+Score
+
+Avatar
+
+AdminSession
+
+MatchState
+
+PlayerRound
+
+Generate or maintain database types so frontend queries remain type-safe.
+
+Avoid:
+
+giant components
+
+duplicated logic
+
+magic numbers
+
+hardcoded URLs
+
+hardcoded secrets
+
+unhandled promises
+
+unused imports
+
+console spam
+
+Centralize event defaults.
+
+Example:
+
+MAX_PLAYERS = 40
+
+ROUND_2_DURATION = 600
+
+Do not duplicate these values across multiple files.
+
+Add tests for:
+
+join
+
+duplicate join
+
+full lobby
+
+start match
+
+duplicate start
+
+round transition
+
+puzzle validation
+
+duplicate completion
+
+score calculation
+
+timer expiration
+
+admin authorization
+
+Create a development-only simulation script capable of simulating approximately 40 player sessions.
+
+Do not ship fake players in production.
+
+Use it only to verify:
+
+real-time lobby
+
+concurrent joins
+
+concurrent completion
+
+match state
+
+The system must be designed so that:
+
+40 players can join
+
+40 players can see the lobby
+
+40 players can receive match start
+
+40 players can download the same puzzle image
+
+40 players can solve independently
+
+40 players can submit
+
+40 results can be processed
+
+without state collisions.
+
+Use one shared optimized puzzle image per round.
+
+Do not generate 40 different copies unnecessarily.
+
+If each player receives the same image:
+
+use CDN/browser caching.
+
+Do not write:
+
+timer every second
+
+drag position every movement
+
+player state every animation frame
+
+Instead:
+
+client handles visual interactions.
+
+Server receives meaningful state changes.
+
+The answer should not be trivially exposed through:
+
+window.INITIAL_STATE
+
+public JSON
+
+localStorage
+
+query parameters
+
+HTML comments
+
+React props accessible through obvious debug data
+
+The authoritative solution must remain protected as reasonably practical.
+
+Before saying the app is complete, verify:
+
+[ ] Player can join
+
+[ ] Name validation works
+
+[ ] Avatar selection works
+
+[ ] 40 player capacity works
+
+[ ] Lobby updates in real time
+
+[ ] Duplicate join protection works
+
+[ ] Admin authentication works
+
+[ ] Admin dashboard works
+
+[ ] Admin sees players
+
+[ ] Admin can generate puzzle
+
+[ ] Admin can upload puzzle
+
+[ ] Admin can configure rounds
+
+[ ] Admin can start match
+
+[ ] All players transition
+
+[ ] Round 1 works
+
+[ ] Drag works
+
+[ ] Tap-to-swap works
+
+[ ] Puzzle validation works
+
+[ ] Score works
+
+[ ] Round 1 transition works
+
+[ ] Round 2 works
+
+[ ] 10-minute timer works
+
+[ ] Timeout works
+
+[ ] Game over works
+
+[ ] Final result works
+
+[ ] Leaderboard works
+
+[ ] Reconnection works
+
+[ ] Refresh recovery works
+
+[ ] Duplicate submission protection works
+
+[ ] Admin double-click protection works
+
+[ ] No secret exposed
+
+[ ] No fake production data
+
+[ ] Mobile UI works
+
+[ ] Desktop admin works
+
+The final game rules are:
+
+RULE 1:
+Players enter their name.
+
+RULE 2:
+Players choose one cartoon animal avatar.
+
+RULE 3:
+Players enter the live lobby.
+
+RULE 4:
+Maximum default players = 40.
+
+RULE 5:
+Players wait until admin starts the match.
+
+RULE 6:
+Admin controls the match.
+
+RULE 7:
+Round 1 is a simple image rearrangement puzzle.
+
+RULE 8:
+Players arrange the pieces into the correct original image.
+
+RULE 9:
+Round 1 awards score based on the configured scoring system.
+
+RULE 10:
+Round 2 is the hard puzzle.
+
+RULE 11:
+Round 2 has a 10-minute shared authoritative timer.
+
+RULE 12:
+When the timer reaches zero, unfinished players receive Game Over.
+
+RULE 13:
+Completed players receive their final score.
+
+RULE 14:
+The server determines valid completion.
+
+RULE 15:
+No duplicate score is possible.
+
+RULE 16:
+No duplicate player session is possible.
+
+RULE 17:
+No client can modify another player's data.
+
+RULE 18:
+No client can modify their own score.
+
+RULE 19:
+Admin actions are authenticated.
+
+RULE 20:
+The entire system must gracefully handle network problems.
+
+The participant experience should feel like this:
+
+OPEN WEBSITE
+
+↓
+
+ENGINEERING DAY
+PUZZLE CHALLENGE
+
+↓
+
+ENTER NAME
+
+↓
+
+CHOOSE YOUR ANIMAL
+
+↓
+
+JOIN GAME
+
+↓
+
+MAIN LOBBY
+
+↓
+
+"Waiting for the challenge to begin..."
+
+↓
+
+40 students can be visible in the lobby
+
+↓
+
+ADMIN PRESSES START MATCH
+
+↓
+
+3
+
+2
+
+1
+
+GO
+
+↓
+
+ROUND 1
+
+SIMPLE PUZZLE
+
+↓
+
+IMAGE PIECES
+
+↓
+
+DRAG / SWAP
+
+↓
+
+PUZZLE SOLVED
+
+↓
+
+SCORE
+
+↓
+
+ROUND 2
+
+HARD PUZZLE
+
+↓
+
+10:00
+
+↓
+
+9:59
+
+↓
+
+...
+
+↓
+
+PUZZLE SOLVED
+
+↓
+
+FINAL SCORE
+
+OR
+
+↓
+
+00:00
+
+↓
+
+GAME OVER
+
+↓
+
+FINAL RESULT
+
+Build the application completely.
+
+Do not stop at UI mockups.
+
+Do not create placeholder buttons that do nothing.
+
+Do not create fake APIs.
+
+Do not create fake timers.
+
+Do not create fake player synchronization.
+
+Do not skip database implementation.
+
+Do not skip RLS.
+
+Do not skip error handling.
+
+Do not skip concurrency protection.
+
+Do not skip mobile touch interactions.
+
+Do not skip admin authentication.
+
+Do not skip Gemini integration.
+
+Do not skip puzzle validation.
+
+Do not skip scoring.
+
+Do not skip timeout handling.
+
+Do not skip reconnection.
+
+Do not skip testing.
+
+If an external service is not configured, implement the integration cleanly and provide the exact environment variable needed rather than replacing it with fake behavior.
+
+Build in this order:
+
+PHASE 1
+Project foundation
+
+PHASE 2
+Database schema
+
+PHASE 3
+Authentication/security
+
+PHASE 4
+Player join flow
+
+PHASE 5
+Avatar system
+
+PHASE 6
+Real-time lobby
+
+PHASE 7
+Admin dashboard
+
+PHASE 8
+Match state machine
+
+PHASE 9
+Round 1 puzzle
+
+PHASE 10
+Round 1 scoring
+
+PHASE 11
+Round transition
+
+PHASE 12
+Round 2 puzzle
+
+PHASE 13
+10-minute timer
+
+PHASE 14
+Game over
+
+PHASE 15
+Final results
+
+PHASE 16
+Gemini puzzle generation
+
+PHASE 17
+Concurrency protection
+
+PHASE 18
+Reconnection
+
+PHASE 19
+40-player testing
+
+PHASE 20
+UI polish
+
+PHASE 21
+Security audit
+
+PHASE 22
+Deployment validation
+
+After completing each phase:
+
+Verify the implementation.
+Check for TypeScript errors.
+Check database errors.
+Check console errors.
+Check mobile layout.
+Check realtime behavior.
+Check security.
+Continue to the next phase only after fixing important problems.
+
+Do not pile unfinished features on top of broken features.
+
+Simulate:
+
+40 participants
+
+1 administrator
+
+All 40 join.
+
+Admin starts.
+
+All 40 receive Round 1.
+
+Players solve.
+
+Scores are stored.
+
+Round 2 begins.
+
+All 40 receive the same Round 2 puzzle.
+
+Timer begins from the authoritative server timestamp.
+
+Players solve at different times.
+
+Some finish.
+
+Some disconnect.
+
+Some reconnect.
+
+Some reach timeout.
+
+At 10 minutes:
+
+unfinished players become Game Over.
+
+Completed players retain their scores.
+
+Leaderboard is generated.
+
+Admin sees all results.
+
+No duplicated records.
+
+No duplicated scores.
+
+No player collision.
+
+No match-state corruption.
+
+No exposed admin credential.
+
+No exposed API secret.
+
+No frontend-only score manipulation.
+
+When implementing this project, provide:
+
+Complete folder structure.
+Complete database SQL.
+Complete frontend.
+Complete backend/Edge Functions.
+Gemini integration.
+Environment variable example.
+RLS policies.
+Realtime configuration.
+Seed avatar data.
+Puzzle creation system.
+Match management.
+Testing instructions.
+Deployment instructions.
+Final verification report.
+
+Use sensible engineering defaults when a minor implementation decision is not specified.
+
+Do not stop development because of small design decisions.
+
+However, never invent:
+
+API keys
+passwords
+database credentials
+external service credentials
+
+Use environment variables.
+
+This is a LIVE COLLEGE EVENT.
+
+The application will potentially be used by approximately 40 students simultaneously.
+
+Reliability is more important than adding unnecessary features.
+
+Prioritize:
+
+Correct match state
+Correct timer
+Correct scoring
+Correct player identity
+Correct realtime synchronization
+Concurrency safety
+Reconnection
+Mobile usability
+Admin control
+Visual polish
+
+Do not sacrifice these for decorative features.
+
+The final application should feel like:
+
+A peaceful modern engineering challenge
+
+combined with:
+
+A polished multiplayer puzzle game.
+
+The player should immediately understand:
+
+Where am I?
+
+What should I do?
+
+How much time remains?
+
+What round am I playing?
+
+What is my score?
+
+What happens next?
+
+The admin should immediately understand:
+
+How many players joined?
+
+Is everyone connected?
+
+What round is active?
+
+How much time remains?
+
+Who completed?
+
+Who is still playing?
+
+Can I safely start/end the match?
+
+The entire experience must be:
+
+CLEAR
+
+FAST
+
+STABLE
+
+REAL-TIME
+
+MOBILE-FIRST
+
+PROFESSIONAL
+
+AND READY FOR ENGINEERING DAY.
