@@ -199,7 +199,7 @@ export const GamePage: React.FC<GamePageProps> = ({
 
       {/* 2. Round Info Banner */}
       <div className="w-full flex items-center justify-between px-2 mb-2 text-xs font-semibold text-slate-600">
-        <span>{isRound1 ? '5×5 Grid • Rebuild the robotics lab' : '25 Pieces • Quantum supercomputer cleanroom'}</span>
+        <span>{isRound1 ? '5×5 Grid • Student Robotics & Automation Workshop' : '25 Pieces • Engineering Builds a Better Tomorrow'}</span>
         <span className="font-mono text-[11px] text-slate-400">{moveCount} moves</span>
       </div>
 

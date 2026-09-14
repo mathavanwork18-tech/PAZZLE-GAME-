@@ -69,8 +69,8 @@ const canonicalSolution25 = Array.from({ length: 25 }, (_, i) => i);
 const initialPuzzles = {
   round1: {
     id: 'puz-r1-robotics',
-    title: 'Robotics & Automation Laboratory',
-    description: 'Precision mechanical assembly and autonomous sensor array',
+    title: 'Student Robotics & Automation Workshop',
+    description: 'Autonomous robotics rover assembly and electronics workshop',
     image_url: '/puzzles/round1_robotics.webp',
     difficulty: 'EASY',
     grid_size: 5,
@@ -80,8 +80,8 @@ const initialPuzzles = {
   },
   round2: {
     id: 'puz-r2-quantum',
-    title: 'Quantum Core & Supercomputing Cleanroom',
-    description: 'Advanced aerospace quantum processor and cryogenic manifold',
+    title: 'Engineering Builds a Better Tomorrow',
+    description: 'Multi-discipline innovation: Aerospace, Robotics, AI, Renewable Energy & Civil Engineering',
     image_url: '/puzzles/round2_quantum.webp',
     difficulty: 'HARD',
     grid_size: 5,
