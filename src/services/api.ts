@@ -1,6 +1,9 @@
 import { MatchState, Player, Avatar, LeaderboardEntry, HatId, GlassesId, OutfitId } from '../types/game';
 
-const API_BASE = '/api';
+const rawApiUrl = (import.meta.env.VITE_API_URL || '').trim().replace(/\/$/, '');
+const API_BASE = rawApiUrl
+  ? (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`)
+  : '/api';
 
 export async function fetchAvatars(): Promise<Avatar[]> {
   const res = await fetch(`${API_BASE}/avatars`);

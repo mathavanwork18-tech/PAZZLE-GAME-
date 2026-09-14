@@ -108,8 +108,21 @@ export const App: React.FC = () => {
     let reconnectTimeout: any;
 
     const connectWs = () => {
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      let wsUrl: string;
+      const envWs = (import.meta.env.VITE_WS_URL || '').trim();
+      const envApi = (import.meta.env.VITE_API_URL || '').trim();
+
+      if (envWs) {
+        wsUrl = envWs.endsWith('/ws') ? envWs : `${envWs.replace(/\/$/, '')}/ws`;
+      } else if (envApi) {
+        const wsProtocol = envApi.startsWith('https:') ? 'wss:' : 'ws:';
+        const host = envApi.replace(/^https?:\/\//, '').split('/')[0];
+        wsUrl = `${wsProtocol}//${host}/ws`;
+      } else {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        wsUrl = `${protocol}//${window.location.host}/ws`;
+      }
+
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
