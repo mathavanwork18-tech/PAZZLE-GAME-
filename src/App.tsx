@@ -153,7 +153,7 @@ export const App: React.FC = () => {
     return () => {
       cleanup();
     };
-  }, [player?.id]);
+  }, []);
 
   // Keep player presence updated across room whenever player state updates
   useEffect(() => {

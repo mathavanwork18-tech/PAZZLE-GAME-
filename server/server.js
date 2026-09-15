@@ -379,14 +379,44 @@ app.post('/api/player/join', (req, res) => {
     return res.json({ success: true, player: updated, session_token: token, match_state: getPublicMatchState() });
   }
 
+  // Allow player to re-enter lobby if using same username
+  const existingByName = db.getPlayerByUsername(cleanName);
+  if (existingByName) {
+    const updated = db.updatePlayerAvatar(existingByName.session_token, {
+      animal_id,
+      hat_id: hat_id || 'none',
+      glasses_id: glasses_id || 'none',
+      outfit_id: outfit_id || 'none'
+    });
+    db.recordHeartbeat(existingByName.session_token);
+    players.set(existingByName.session_token, updated || existingByName);
+    usernamesMap.set(lowerName, existingByName.session_token);
+    broadcastPlayersList();
+    return res.json({
+      success: true,
+      player: updated || existingByName,
+      session_token: existingByName.session_token,
+      match_state: getPublicMatchState()
+    });
+  }
+
   // Capacity Limit (Configurable, default 40)
   if (db.getPlayerCount() >= gameState.max_players) {
     return res.status(403).json({ success: false, error: 'Lobby is full. Please contact the event coordinator.' });
   }
 
-  // Prevent joining if match is concluded
-  if (gameState.status === 'COMPLETED') {
-    return res.status(403).json({ success: false, error: 'Match is already concluded.' });
+  // If match was previously concluded, reset state to WAITING for new challenge session
+  if (gameState.status === 'COMPLETED' || gameState.status === 'STOPPED') {
+    gameState.status = 'WAITING';
+    gameState.current_round = 1;
+    gameState.round_1_start_at = null;
+    gameState.round_1_end_at = null;
+    gameState.round_2_start_at = null;
+    gameState.round_2_end_at = null;
+    gameState.match_start_time = null;
+    gameState.match_end_time = null;
+    gameState.version += 1;
+    broadcastMatchState();
   }
 
   const playerShuffledR1 = generateShuffledArray(25);

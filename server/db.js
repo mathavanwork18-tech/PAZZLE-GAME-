@@ -315,6 +315,12 @@ export function getPlayerByToken(sessionToken) {
   return formatPlayerRow(row);
 }
 
+export function getPlayerByUsername(username) {
+  if (!username) return null;
+  const row = getPlayerByNormalizedNameStmt.get(username.trim().toLowerCase());
+  return formatPlayerRow(row);
+}
+
 export function updatePlayerAvatar(sessionToken, { animal_id, hat_id, glasses_id, outfit_id }) {
   const row = getPlayerByTokenStmt.get(sessionToken);
   if (!row) return null;

@@ -167,27 +167,38 @@ export async function savePlayerNameToSupabase(name: string): Promise<void> {
   if (!clean) return;
 
   try {
-    const { error } = await supabase
+    const { data: existing } = await supabase
       .from('players')
-      .upsert({
-        name: clean,
-        player_code: `ENG-${Math.floor(1000 + Math.random() * 9000)}`,
-        animal_id: 'fox',
-        hat_id: 'none',
-        status: 'WAITING',
-        connection_status: 'connected',
-        session_token: `tok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        session_token_hash: '',
-        last_seen_at: new Date().toISOString()
-      }, { onConflict: 'name' });
+      .select('id')
+      .ilike('name', clean)
+      .maybeSingle();
 
-    if (!error) {
-      console.log(`[Supabase] Player name "${clean}" saved directly to database.`);
+    if (existing && existing.id) {
+      await supabase
+        .from('players')
+        .update({
+          last_seen_at: new Date().toISOString(),
+          connection_status: 'connected'
+        })
+        .eq('id', existing.id);
     } else {
-      console.warn('[Supabase] Direct name storage notice:', error.message);
+      await supabase
+        .from('players')
+        .insert({
+          name: clean,
+          player_code: `ENG-${Math.floor(1000 + Math.random() * 9000)}`,
+          animal_id: 'fox',
+          hat_id: 'none',
+          status: 'WAITING',
+          connection_status: 'connected',
+          session_token: `tok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+          session_token_hash: '',
+          last_seen_at: new Date().toISOString()
+        });
     }
+    console.log(`[Supabase] Player name "${clean}" saved directly to database.`);
   } catch (err) {
-    console.warn('[Supabase] Direct name storage exception:', err);
+    console.warn('[Supabase] Direct name storage notice:', err);
   }
 }
 
@@ -215,17 +226,25 @@ export async function savePlayerToSupabase(player: Player): Promise<void> {
       last_seen_at: new Date().toISOString()
     };
 
-    const { error } = await supabase
+    const { data: existing } = await supabase
       .from('players')
-      .upsert(row, { onConflict: 'name' });
+      .select('id')
+      .ilike('name', player.name)
+      .maybeSingle();
 
-    if (!error) {
-      console.log(`[Supabase] Player "${player.name}" fully saved to database.`);
+    if (existing && existing.id) {
+      await supabase
+        .from('players')
+        .update(row)
+        .eq('id', existing.id);
     } else {
-      console.warn('[Supabase] Player record save notice:', error.message);
+      await supabase
+        .from('players')
+        .insert(row);
     }
+    console.log(`[Supabase] Player "${player.name}" fully saved to database.`);
   } catch (err) {
-    console.warn('[Supabase] Player record save exception:', err);
+    console.warn('[Supabase] Player record save notice:', err);
   }
 }
 
@@ -248,7 +267,7 @@ export async function joinPlayer(
   // Tier 1: Try Express API
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
     const res = await fetch(`${API_BASE}/player/join`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -274,12 +293,17 @@ export async function joinPlayer(
         localStorage.setItem('eng_player_data', JSON.stringify(data.player));
         return data;
       }
-      if (data.error && !data.error.includes('Failed to fetch')) {
-        throw new Error(data.error);
+      if (data.error) {
+        // If match was concluded, do not abort; let player join the fresh lobby
+        if (data.error.toLowerCase().includes('concluded')) {
+          console.warn('Backend match concluded; allowing lobby join.');
+        } else {
+          throw new Error(data.error);
+        }
       }
     }
   } catch (apiErr: any) {
-    if (apiErr?.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('abort')) {
+    if (apiErr?.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('abort') && !apiErr.message.toLowerCase().includes('concluded')) {
       throw apiErr;
     }
   }

@@ -17,7 +17,14 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
   maxPlayers,
   countdown
 }) => {
-  const isFull = playersList.length >= maxPlayers;
+  // Ensure currentPlayer is always included in the effective display list
+  const hasCurrent = playersList.some(
+    (p) => (p.id && p.id === currentPlayer.id) || 
+           (p.player_id && p.player_id === currentPlayer.player_id) || 
+           (p.name && p.name.toLowerCase() === currentPlayer.name.toLowerCase())
+  );
+  const displayList = hasCurrent ? playersList : [currentPlayer, ...playersList];
+  const isFull = displayList.length >= maxPlayers;
 
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 animate-fade-in pb-24 relative">
@@ -85,7 +92,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
             </span>
           </div>
           <span className="text-sm font-black text-blue-700 font-mono">
-            {playersList.length} / {maxPlayers} PLAYERS
+            {displayList.length} / {maxPlayers} PLAYERS
           </span>
         </div>
 
@@ -93,7 +100,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
         <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
           <div
             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-            style={{ width: `${Math.min(100, (playersList.length / maxPlayers) * 100)}%` }}
+            style={{ width: `${Math.min(100, (displayList.length / maxPlayers) * 100)}%` }}
           />
         </div>
 
@@ -107,15 +114,15 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
       {/* Joined Players Avatar Wall / Responsive Grid */}
       <div className="mb-6">
         <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 px-1">
-          Joined Players ({playersList.length})
+          Joined Players ({displayList.length})
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-          {playersList.map((p, idx) => {
-            const isSelf = p.id === currentPlayer.id;
+          {displayList.map((p, idx) => {
+            const isSelf = p.id === currentPlayer.id || p.player_id === currentPlayer.player_id || p.name.toLowerCase() === currentPlayer.name.toLowerCase();
             return (
               <div
-                key={p.id}
+                key={p.id || p.player_id || idx}
                 className={`p-2.5 rounded-2xl flex items-center space-x-2.5 border transition-all ${
                   isSelf
                     ? 'bg-blue-50/80 border-blue-400 shadow-sm'
@@ -149,7 +156,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
           })}
         </div>
 
-        {playersList.length === 0 && (
+        {displayList.length === 0 && (
           <div className="text-center py-12 text-slate-400 text-xs bg-white rounded-3xl border border-slate-200">
             No players have joined yet.
           </div>
