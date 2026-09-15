@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "server": "node server/server.js",
     "start": "node server/server.js",
-    "test:sim": "node scripts/simulate_40_players.js"
+    "test:sim": "node scripts/simulate_40_players.js",
+    "test:sim100": "node scripts/simulate_100_players.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",

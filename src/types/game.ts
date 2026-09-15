@@ -1,5 +1,6 @@
 export type MatchStatus = 
   | 'WAITING'
+  | 'COUNTDOWN'
   | 'STARTING'
   | 'ROUND_1'
   | 'ROUND_2'
@@ -8,16 +9,19 @@ export type MatchStatus =
   | 'COMPLETED';
 
 export type PlayerStatus = 
-  | 'CONNECTED'
+  | 'LOBBY'
   | 'WAITING'
   | 'PLAYING'
+  | 'SPECTATOR'
+  | 'KICKED'
   | 'ROUND_1_COMPLETE'
   | 'ROUND_2_PLAYING'
   | 'COMPLETED'
   | 'DISCONNECTED'
   | 'STOPPED'
   | 'GAME_OVER'
-  | 'TIME_UP';
+  | 'TIME_UP'
+  | 'CONNECTED';
 
 export interface Avatar {
   id: string;
@@ -71,6 +75,13 @@ export interface Player {
   glasses_id: GlassesId;
   outfit_id: OutfitId;
   status: PlayerStatus;
+  game_status?: PlayerStatus;
+  player_status?: PlayerStatus;
+  join_type?: 'NORMAL' | 'LATE';
+  admitted_by_admin?: boolean;
+  admitted_at?: number | null;
+  round_1_reward_claimed?: boolean;
+  round_2_reward_claimed?: boolean;
   connection_status: 'connected' | 'disconnected';
   session_token: string;
   joined_at: number;
@@ -122,6 +133,8 @@ export interface MatchState {
   round_2_end_at: number | null;
   match_start_time: number | null;
   match_end_time: number | null;
+  countdown_start_at?: number | null;
+  countdown_target_at?: number | null;
   is_paused: boolean;
   paused_at: number | null;
   stop_reason?: string;
@@ -132,6 +145,7 @@ export interface MatchState {
 
 export interface LeaderboardEntry {
   id: string;
+  player_id?: string;
   name: string;
   animal_id: string;
   hat_id: HatId;
@@ -145,5 +159,29 @@ export interface LeaderboardEntry {
   completed_round_1: boolean;
   completed_round_2: boolean;
   status: PlayerStatus;
+  player_status?: PlayerStatus;
+  join_type?: 'NORMAL' | 'LATE';
+  admitted_by_admin?: boolean;
   rank: number;
+}
+
+export interface CoinTransaction {
+  id: number;
+  player_id: string;
+  match_id: string;
+  amount: number;
+  transaction_type: string;
+  description: string;
+  created_at: number;
+  created_at_iso: string;
+}
+
+export interface AuditLogEntry {
+  id: number;
+  match_id: string;
+  action: string;
+  target_player_id?: string | null;
+  details?: string | null;
+  created_at: number;
+  created_at_iso: string;
 }

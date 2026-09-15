@@ -18,6 +18,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
 const ADMIN_CODE = process.env.ADMIN_INITIAL_CODE || 'admin@123';
+const EMERGENCY_REJOIN_CODE = process.env.EMERGENCY_REJOIN_CODE || '0000';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 
 let genAI = null;
@@ -25,9 +26,7 @@ if (GEMINI_KEY) {
   genAI = new GoogleGenerativeAI(GEMINI_KEY);
 }
 
-// ==========================================================
-// 12 CARTOON ANIMAL MASCOTS (Illustrated Cartoon Mascots)
-// ==========================================================
+// 16 Mascots
 const avatarsList = [
   { id: 'lion', name: 'Lion', image_url: '/avatars/lion.png', accent_color: '#EF4444' },
   { id: 'tiger', name: 'Tiger', image_url: '/avatars/tiger.png', accent_color: '#F97316' },
@@ -47,15 +46,12 @@ const avatarsList = [
   { id: 'zebra', name: 'Zebra', image_url: '/avatars/zebra.png', accent_color: '#9333EA' }
 ];
 
-// Helper to generate non-trivial shuffled permutation for 25-piece grid
 function generateShuffledArray(size = 25) {
   const arr = Array.from({ length: size }, (_, i) => i);
-  // Fisher-Yates shuffle
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
-  // Ensure not solved already
   let matches = 0;
   for (let i = 0; i < size; i++) {
     if (arr[i] === i) matches++;
@@ -67,7 +63,6 @@ function generateShuffledArray(size = 25) {
   return arr;
 }
 
-// Canonical 25-piece solution
 const canonicalSolution25 = Array.from({ length: 25 }, (_, i) => i);
 
 const initialPuzzles = {
@@ -95,21 +90,21 @@ const initialPuzzles = {
   }
 };
 
-// Authoritative Match State
+// Global Match State
 let gameState = {
-  match_id: 'match-eng-2026-01',
+  match_id: 'MATCH-0001',
   event_title: 'ENGINEERING DAY',
   event_subtitle: 'PUZZLE CHALLENGE',
   match_code: 'ENGDAY26',
-  status: 'WAITING', // WAITING, STARTING, ROUND_1, ROUND_2, PAUSED, STOPPED, COMPLETED
+  status: 'WAITING', // WAITING, COUNTDOWN, ROUND_1, ROUND_2, PAUSED, STOPPED, COMPLETED
   previous_status: null,
   current_round: 1,
   max_players: 40,
   
-  // Timing (Authoritative 10-Minute Total Challenge: 600s)
+  // Timing
   round_1_duration_seconds: 180,
   round_2_duration_seconds: 600,
-  match_duration_seconds: 600,   // 10 minutes total match timer
+  match_duration_seconds: 600,
   round_1_start_at: null,
   round_1_end_at: null,
   round_2_start_at: null,
@@ -117,11 +112,14 @@ let gameState = {
   match_start_time: null,
   match_end_time: null,
   
+  // Synchronized countdown (3-2-1-GO)
+  countdown_start_at: null,
+  countdown_target_at: null,
+  
   is_paused: false,
   paused_at: null,
   total_paused_ms: 0,
   stop_reason: null,
-  
   version: 1,
   
   puzzles: {
@@ -130,7 +128,7 @@ let gameState = {
   }
 };
 
-// In-Memory fast lookup caches synced with Database
+// In-Memory fast lookup caches synced with SQLite
 const players = new Map();
 const usernamesMap = new Map();
 const processedRequests = new Map();
@@ -153,7 +151,7 @@ try {
   console.error('Error loading initial database state:', err);
 }
 
-// Helper: Broadcast WebSocket message
+// Real-Time Broadcast Helpers
 function broadcast(type, payload) {
   const message = JSON.stringify({ type, payload, server_now: Date.now() });
   for (const [ws] of clients.entries()) {
@@ -178,8 +176,14 @@ function broadcastPlayersList() {
     hat_id: p.hat_id || 'none',
     glasses_id: p.glasses_id || 'none',
     outfit_id: p.outfit_id || 'none',
-    status: p.status,
-    game_status: p.status,
+    status: p.player_status || p.status,
+    game_status: p.game_status || p.status,
+    player_status: p.player_status || p.status,
+    join_type: p.join_type || 'NORMAL',
+    admitted_by_admin: Boolean(p.admitted_by_admin),
+    admitted_at: p.admitted_at,
+    round_1_reward_claimed: Boolean(p.round_1_reward_claimed),
+    round_2_reward_claimed: Boolean(p.round_2_reward_claimed),
     connection_status: p.connection_status,
     joined_at: p.joined_at,
     last_seen_at: p.last_seen_at,
@@ -193,8 +197,11 @@ function broadcastPlayersList() {
     round_2_time_ms: p.round_2_time_ms || 0
   }));
 
+  const activeCount = playersList.filter(p => p.player_status !== 'KICKED' && p.player_status !== 'SPECTATOR').length;
+
   broadcast('PLAYERS_LIST_UPDATE', {
-    count: playersList.length,
+    count: activeCount,
+    total_registered: playersList.length,
     max_players: gameState.max_players,
     players: playersList
   });
@@ -219,6 +226,8 @@ function getPublicMatchState() {
     round_2_end_at: gameState.round_2_end_at,
     match_start_time: gameState.match_start_time,
     match_end_time: gameState.match_end_time,
+    countdown_start_at: gameState.countdown_start_at,
+    countdown_target_at: gameState.countdown_target_at,
     is_paused: gameState.is_paused,
     paused_at: gameState.paused_at,
     stop_reason: gameState.stop_reason,
@@ -244,7 +253,49 @@ setInterval(() => {
     return;
   }
 
-  // Check 10-minute overall match timer expiration
+  // 1. Authoritative Countdown Transition to Round 1
+  if (gameState.status === 'COUNTDOWN') {
+    if (gameState.countdown_target_at && now >= gameState.countdown_target_at) {
+      console.log('🏁 Synchronized 3-2-1-GO Countdown concluded! Transitioning to ROUND_1.');
+      const matchDurationMs = (gameState.match_duration_seconds || 600) * 1000;
+      gameState.status = 'ROUND_1';
+      gameState.current_round = 1;
+      gameState.match_start_time = gameState.countdown_target_at;
+      gameState.match_end_time = gameState.countdown_target_at + matchDurationMs;
+      gameState.round_1_start_at = gameState.countdown_target_at;
+      gameState.round_1_end_at = gameState.countdown_target_at + (gameState.round_1_duration_seconds * 1000);
+      gameState.countdown_start_at = null;
+      gameState.countdown_target_at = null;
+      gameState.version++;
+      db.saveMatchState(gameState);
+
+      // Transition all eligible lobby players to PLAYING
+      for (const player of players.values()) {
+        if (player.player_status === 'LOBBY' || player.game_status === 'WAITING') {
+          player.player_status = 'PLAYING';
+          player.game_status = 'PLAYING';
+          db.updatePlayerStatus(player.session_token, 'PLAYING');
+        }
+      }
+
+      broadcastGameState();
+      broadcastPlayersList();
+      broadcast('MATCH_STARTED', {
+        match_start_time: gameState.match_start_time,
+        match_end_time: gameState.match_end_time
+      });
+      broadcast('TOAST', { message: 'Round 1 is LIVE! Solve the puzzle!' });
+      db.recordAuditLog({
+        matchId: gameState.match_id,
+        action: 'MATCH_STARTED',
+        details: 'Countdown ended. Round 1 officially began.'
+      });
+      return;
+    }
+    return;
+  }
+
+  // 2. Authoritative 10-minute overall match timer expiration
   if (gameState.match_end_time && now >= gameState.match_end_time) {
     console.log('⏰ Authoritative 10-Minute Challenge Time Expired! Transitioning to COMPLETED.');
     gameState.status = 'COMPLETED';
@@ -252,27 +303,35 @@ setInterval(() => {
     db.saveMatchState(gameState);
 
     for (const player of players.values()) {
-      if (!player.completed_round_2) {
-        player.status = 'GAME_OVER';
+      if (!player.completed_round_2 && player.player_status !== 'KICKED') {
+        player.player_status = 'TIME_UP';
+        player.status = 'TIME_UP';
+        player.game_status = 'TIME_UP';
       }
     }
 
     broadcastGameState();
     broadcastPlayersList();
     broadcast('MATCH_COMPLETED', { reason: 'TIME_EXPIRED', message: "Time is up! Your result has been saved." });
+    db.recordAuditLog({
+      matchId: gameState.match_id,
+      action: 'MATCH_ENDED_TIME_EXPIRED',
+      details: 'Global 10-minute match timer expired.'
+    });
     return;
   }
 
-  // Round 1 auto-transition if individual round timer expires
+  // 3. Round 1 auto-transition if individual round timer expires
   if (gameState.status === 'ROUND_1' && gameState.round_1_end_at && now >= gameState.round_1_end_at) {
-    console.log('⏰ Round 1 time expired.');
+    console.log('⏰ Round 1 time expired. Transitioning to Round 2.');
     gameState.status = 'ROUND_2';
     gameState.current_round = 2;
     gameState.version++;
     db.saveMatchState(gameState);
 
     for (const player of players.values()) {
-      if (!player.completed_round_1) {
+      if (!player.completed_round_1 && player.player_status === 'PLAYING') {
+        player.player_status = 'PLAYING';
         player.status = 'ROUND_2_PLAYING';
       }
     }
@@ -281,7 +340,7 @@ setInterval(() => {
     broadcastPlayersList();
     broadcast('TOAST', { message: "Round 1 time is up! Moving to Round 2." });
   }
-}, 1000);
+}, 250);
 
 // Heartbeat & Connection presence check
 setInterval(() => {
@@ -312,7 +371,7 @@ app.get('/api/match/state', (req, res) => {
   res.json({ success: true, state: getPublicMatchState() });
 });
 
-// Check Username Availability (Case-Insensitive Database Enforced)
+// Check Username Availability
 app.get('/api/player/check-username', (req, res) => {
   const rawName = (req.query.name || '').toString();
   const clean = rawName.trim();
@@ -334,7 +393,7 @@ app.get('/api/player/check-username', (req, res) => {
   return res.json({ available: true, message: 'Username available' });
 });
 
-// Player Join / Register (Database-Enforced Atomic Uniqueness)
+// Player Join / Register (Authoritative Rules)
 app.post('/api/player/join', (req, res) => {
   const { name, animal_id, hat_id, glasses_id, outfit_id, session_token } = req.body;
 
@@ -358,7 +417,7 @@ app.post('/api/player/join', (req, res) => {
   const token = session_token || uuidv4();
   const lowerName = cleanName.toLowerCase();
 
-  // Reconnection / Session recovery for existing token
+  // 1. Reconnection / Session recovery for existing token
   const existingPlayer = db.getPlayerByToken(token);
   if (existingPlayer) {
     if (existingPlayer.username_normalized !== lowerName) {
@@ -376,10 +435,16 @@ app.post('/api/player/join', (req, res) => {
     players.set(token, updated);
     usernamesMap.set(lowerName, token);
     broadcastPlayersList();
-    return res.json({ success: true, player: updated, session_token: token, match_state: getPublicMatchState() });
+    return res.json({
+      success: true,
+      player: updated,
+      session_token: token,
+      match_state: getPublicMatchState(),
+      is_late_joiner: updated.join_type === 'LATE'
+    });
   }
 
-  // Allow player to re-enter lobby if using same username
+  // 2. Allow existing registered player to re-enter using same username
   const existingByName = db.getPlayerByUsername(cleanName);
   if (existingByName) {
     const updated = db.updatePlayerAvatar(existingByName.session_token, {
@@ -396,34 +461,36 @@ app.post('/api/player/join', (req, res) => {
       success: true,
       player: updated || existingByName,
       session_token: existingByName.session_token,
-      match_state: getPublicMatchState()
+      match_state: getPublicMatchState(),
+      is_late_joiner: (updated || existingByName).join_type === 'LATE'
     });
   }
 
-  // Capacity Limit (Configurable, default 40)
+  // 3. Stopped or Concluded Match Check
+  if (gameState.status === 'STOPPED') {
+    return res.status(400).json({ success: false, error: 'Match has been stopped by the administrator.' });
+  }
+  if (gameState.status === 'COMPLETED') {
+    return res.status(400).json({ success: false, error: 'Match has concluded.' });
+  }
+
+  // 4. Capacity Limit Enforcement (Max 40 by default, configurable)
   if (db.getPlayerCount() >= gameState.max_players) {
     return res.status(403).json({ success: false, error: 'Lobby is full. Please contact the event coordinator.' });
   }
 
-  // If match was previously concluded, reset state to WAITING for new challenge session
-  if (gameState.status === 'COMPLETED' || gameState.status === 'STOPPED') {
-    gameState.status = 'WAITING';
-    gameState.current_round = 1;
-    gameState.round_1_start_at = null;
-    gameState.round_1_end_at = null;
-    gameState.round_2_start_at = null;
-    gameState.round_2_end_at = null;
-    gameState.match_start_time = null;
-    gameState.match_end_time = null;
-    gameState.version += 1;
-    broadcastMatchState();
-  }
+  // 5. Late Joiner vs Normal Joiner Determination
+  const isMatchActive = gameState.status === 'COUNTDOWN' ||
+    gameState.status === 'ROUND_1' ||
+    gameState.status === 'ROUND_2' ||
+    gameState.status === 'PAUSED';
+
+  const join_type = isMatchActive ? 'LATE' : 'NORMAL';
+  const player_status = isMatchActive ? 'SPECTATOR' : 'LOBBY';
+  const game_status = isMatchActive ? 'SPECTATOR' : 'WAITING';
 
   const playerShuffledR1 = generateShuffledArray(25);
   const playerShuffledR2 = generateShuffledArray(25);
-  const initialStatus = (gameState.status === 'ROUND_1' || gameState.status === 'ROUND_2')
-    ? 'PLAYING'
-    : (gameState.status === 'STOPPED' ? 'STOPPED' : 'WAITING');
 
   try {
     const newPlayer = db.createPlayerRecord({
@@ -435,19 +502,28 @@ app.post('/api/player/join', (req, res) => {
       session_token: token,
       shuffled_puzzle_r1: playerShuffledR1,
       shuffled_puzzle_r2: playerShuffledR2,
-      game_status: initialStatus
+      game_status,
+      player_status,
+      join_type,
+      admitted_by_admin: 0
     });
 
     players.set(token, newPlayer);
     usernamesMap.set(lowerName, token);
     broadcastPlayersList();
-    broadcast('TOAST', { message: `${cleanName} (${newPlayer.player_id}) joined the lobby` });
+
+    if (join_type === 'LATE') {
+      broadcast('TOAST', { message: `${cleanName} joined as a spectator (Match in progress)` });
+    } else {
+      broadcast('TOAST', { message: `${cleanName} (${newPlayer.player_id}) joined the lobby` });
+    }
 
     res.json({
       success: true,
       player: newPlayer,
       session_token: token,
-      match_state: getPublicMatchState()
+      match_state: getPublicMatchState(),
+      is_late_joiner: join_type === 'LATE'
     });
   } catch (err) {
     if (err.code === 'USERNAME_TAKEN' || (err.message && err.message.includes('UNIQUE constraint'))) {
@@ -458,7 +534,7 @@ app.post('/api/player/join', (req, res) => {
   }
 });
 
-// Update Player Avatar (Persisted in DB & Broadcasted)
+// Update Player Avatar
 app.post('/api/player/update-avatar', (req, res) => {
   const { session_token, animal_id, hat_id, glasses_id, outfit_id } = req.body;
   if (!session_token) {
@@ -473,7 +549,7 @@ app.post('/api/player/update-avatar', (req, res) => {
   res.json({ success: true, player: updated });
 });
 
-// Restore Player Session (Page Refresh / Reconnect Handler directly from DB)
+// Restore Player Session
 app.get('/api/player/session/:token', (req, res) => {
   const { token } = req.params;
   const player = db.getPlayerByToken(token);
@@ -525,7 +601,7 @@ app.post('/api/player/advance-round-2', (req, res) => {
   res.json({ success: true, player: updatedPlayer });
 });
 
-// Authoritative Puzzle Submission with DB Idempotency
+// Authoritative Puzzle Submission with Exact Coin Ledger & Idempotency
 app.post('/api/puzzle/submit', (req, res) => {
   const { session_token, round_number, solution_order, move_count, request_id } = req.body;
 
@@ -542,11 +618,19 @@ app.post('/api/puzzle/submit', (req, res) => {
     return res.status(404).json({ success: false, error: 'Player record not found.' });
   }
 
-  // Check if match is active
+  // 1. Kick & Spectator Checks
+  if (player.player_status === 'KICKED' || player.status === 'KICKED') {
+    return res.status(403).json({ success: false, error: 'You have been removed from the match.' });
+  }
+  if (player.player_status === 'SPECTATOR' || player.status === 'SPECTATOR') {
+    return res.status(400).json({ success: false, error: 'Spectators cannot submit puzzle solutions. Please contact the administrator.' });
+  }
+
+  // 2. Match Active Checks
   if (gameState.status === 'STOPPED') {
     return res.status(400).json({ success: false, error: 'Challenge is currently stopped by administrator.' });
   }
-  if (gameState.is_paused) {
+  if (gameState.status === 'PAUSED' || gameState.is_paused) {
     return res.status(400).json({ success: false, error: 'Challenge is currently paused.' });
   }
 
@@ -555,7 +639,7 @@ app.post('/api/puzzle/submit', (req, res) => {
     return res.status(400).json({ success: false, error: 'Challenge time has expired.' });
   }
 
-  // Verify Round eligibility
+  // 3. Verify Round Eligibility
   if (round_number === 1) {
     if (player.completed_round_1) {
       return res.status(400).json({ success: false, error: 'Round 1 has already been completed.' });
@@ -571,7 +655,7 @@ app.post('/api/puzzle/submit', (req, res) => {
     return res.status(400).json({ success: false, error: 'Invalid round number.' });
   }
 
-  // Verify 25-piece canonical order: [0, 1, 2, ..., 24]
+  // 4. Verify 25-piece canonical order: [0, 1, 2, ..., 24]
   if (!Array.isArray(solution_order) || solution_order.length !== 25) {
     return res.json({ success: true, correct: false, error: 'Invalid piece count. Expected 25 pieces.' });
   }
@@ -581,9 +665,10 @@ app.post('/api/puzzle/submit', (req, res) => {
     return res.json({ success: true, correct: false, message: 'Puzzle is not yet complete.' });
   }
 
-  // Scoring
+  // 5. Authoritative Scoring & Coins Calculation
+  // Round 1 reward: exactly 100 coins. Round 2 reward: exactly 200 coins
   const baseScore = round_number === 1 ? 100 : 200;
-  const coinsEarned = round_number === 1 ? 50 : 25;
+  const configuredRewardCoins = round_number === 1 ? 100 : 200;
 
   const matchStart = gameState.match_start_time || gameState.round_1_start_at || now;
   const matchEnd = gameState.match_end_time || now + 600000;
@@ -596,14 +681,14 @@ app.post('/api/puzzle/submit', (req, res) => {
   const moveBonus = Math.max(0, (idealMoves - moves) * 2);
   const awardedScore = baseScore + timeBonus + moveBonus;
 
-  // DB completion with idempotency guard
-  const { updated, player: updatedPlayer } = db.completeRound({
+  // DB completion with atomic transaction & coin ledger insertion
+  const { updated, alreadyClaimed, player: updatedPlayer } = db.completeRound({
     sessionToken: session_token,
     roundNumber: round_number,
     awardedScore,
-    coinsEarned,
     moves,
-    solveTimeMs
+    solveTimeMs,
+    matchId: gameState.match_id
   });
 
   if (updatedPlayer) {
@@ -617,7 +702,7 @@ app.post('/api/puzzle/submit', (req, res) => {
     correct: true,
     round_number,
     awarded_score: awardedScore,
-    coins_earned: coinsEarned,
+    coins_earned: alreadyClaimed ? 0 : configuredRewardCoins,
     total_coins: finalPlayer.coins,
     total_score: finalPlayer.total_score,
     solve_time_ms: solveTimeMs,
@@ -636,13 +721,13 @@ app.post('/api/puzzle/submit', (req, res) => {
     animal_id: finalPlayer.animal_id,
     round_number,
     score: awardedScore,
-    coins: coinsEarned
+    coins: configuredRewardCoins
   });
 
   res.json(responsePayload);
 });
 
-// Leaderboard Endpoint (Sorted by Rounds completed -> Total Score DESC)
+// Leaderboard Endpoint
 app.get('/api/match/leaderboard', (req, res) => {
   const all = db.getAllPlayers();
   res.json({ success: true, leaderboard: all });
@@ -671,42 +756,77 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ success: false, error: 'Invalid admin code.' });
 });
 
-// Get Admin Players List (With full monitor fields)
+// Verify Emergency Admission Code (0000)
+app.post('/api/admin/verify-emergency-code', requireAdmin, (req, res) => {
+  const { code } = req.body;
+  if (code === EMERGENCY_REJOIN_CODE) {
+    return res.json({ success: true, verified: true });
+  }
+  res.status(401).json({ success: false, error: 'Invalid emergency code.' });
+});
+
+// Get Admin Players List
 app.get('/api/admin/players', requireAdmin, (req, res) => {
   const allPlayers = db.getAllPlayers();
   res.json({ success: true, players: allPlayers });
 });
 
-// 1. START MATCH
+// Get Late Joiners / Spectators
+app.get('/api/admin/late-joiners', requireAdmin, (req, res) => {
+  const lateJoiners = db.getLateJoiners();
+  res.json({ success: true, late_joiners: lateJoiners });
+});
+
+// Get Kicked Players
+app.get('/api/admin/kicked-players', requireAdmin, (req, res) => {
+  const kicked = db.getKickedPlayers();
+  res.json({ success: true, kicked_players: kicked });
+});
+
+// Get Coin Transaction Ledger
+app.get('/api/admin/coin-transactions', requireAdmin, (req, res) => {
+  const playerId = req.query.player_id;
+  const transactions = db.getCoinTransactions(playerId);
+  res.json({ success: true, transactions });
+});
+
+// Get Audit Logs
+app.get('/api/admin/audit-logs', requireAdmin, (req, res) => {
+  const logs = db.getAuditLogs();
+  res.json({ success: true, logs });
+});
+
+// 1. START MATCH: Initiates Synchronized 3-2-1-GO Countdown
 app.post('/api/admin/start-match', requireAdmin, (req, res) => {
-  if (gameState.status !== 'WAITING' && gameState.status !== 'STOPPED') {
-    return res.status(400).json({ success: false, error: `Match cannot be started from current status (${gameState.status}).` });
+  if (gameState.status === 'COUNTDOWN') {
+    return res.status(400).json({ success: false, error: 'Match countdown is already in progress.' });
+  }
+  if (gameState.status === 'ROUND_1' || gameState.status === 'ROUND_2') {
+    return res.status(400).json({ success: false, error: 'Match is already running.' });
   }
 
   const now = Date.now();
-  const matchDurationMs = (gameState.match_duration_seconds || 600) * 1000;
-
-  gameState.status = 'ROUND_1';
-  gameState.current_round = 1;
-  gameState.match_start_time = now;
-  gameState.match_end_time = now + matchDurationMs;
-  gameState.round_1_start_at = now;
-  gameState.round_1_end_at = now + (gameState.round_1_duration_seconds * 1000);
+  gameState.status = 'COUNTDOWN';
+  gameState.countdown_start_at = now;
+  gameState.countdown_target_at = now + 4000; // 4 seconds total (3, 2, 1, GO)
   gameState.is_paused = false;
   gameState.stop_reason = null;
   gameState.version++;
 
   db.saveMatchState(gameState);
-
-  for (const p of players.values()) {
-    p.status = 'PLAYING';
-    db.updatePlayerStatus(p.session_token, 'PLAYING');
-  }
+  db.recordAuditLog({
+    matchId: gameState.match_id,
+    action: 'MATCH_COUNTDOWN_STARTED',
+    details: { target_start_at: gameState.countdown_target_at }
+  });
 
   broadcastGameState();
-  broadcastPlayersList();
-  broadcast('MATCH_STARTED', { match_start_time: now, match_end_time: gameState.match_end_time });
-  broadcast('TOAST', { message: 'Match started! Round 1 is live!' });
+  broadcast('MATCH_COUNTDOWN', {
+    countdown_start_at: gameState.countdown_start_at,
+    countdown_target_at: gameState.countdown_target_at,
+    server_now: now
+  });
+  broadcast('TOAST', { message: 'Match starting! 3... 2... 1...' });
 
   res.json({ success: true, match_state: getPublicMatchState() });
 });
@@ -720,13 +840,21 @@ app.post('/api/admin/stop-match', requireAdmin, (req, res) => {
   gameState.previous_status = gameState.status;
   gameState.status = 'STOPPED';
   gameState.stop_reason = 'The administrator has stopped this challenge.';
+  gameState.countdown_start_at = null;
+  gameState.countdown_target_at = null;
   gameState.version++;
 
   db.saveMatchState(gameState);
   db.updateAllActivePlayersStatus('STOPPED');
+  db.recordAuditLog({
+    matchId: gameState.match_id,
+    action: 'MATCH_STOPPED',
+    details: gameState.stop_reason
+  });
 
   for (const p of players.values()) {
-    if (p.status !== 'COMPLETED') {
+    if (p.player_status !== 'COMPLETED' && p.player_status !== 'KICKED') {
+      p.player_status = 'STOPPED';
       p.status = 'STOPPED';
     }
   }
@@ -751,6 +879,7 @@ app.post('/api/admin/pause', requireAdmin, (req, res) => {
   gameState.paused_at = Date.now();
   gameState.version++;
   db.saveMatchState(gameState);
+  db.recordAuditLog({ matchId: gameState.match_id, action: 'MATCH_PAUSED', details: { paused_at: gameState.paused_at } });
 
   broadcastGameState();
   broadcast('MATCH_PAUSED', { paused_at: gameState.paused_at });
@@ -779,6 +908,7 @@ app.post('/api/admin/resume', requireAdmin, (req, res) => {
   }
   gameState.version++;
   db.saveMatchState(gameState);
+  db.recordAuditLog({ matchId: gameState.match_id, action: 'MATCH_RESUMED', details: { pausedDuration } });
 
   broadcastGameState();
   broadcast('MATCH_RESUMED', { server_now: Date.now() });
@@ -797,6 +927,8 @@ app.post('/api/admin/reset-match', requireAdmin, (req, res) => {
   gameState.round_1_end_at = null;
   gameState.round_2_start_at = null;
   gameState.round_2_end_at = null;
+  gameState.countdown_start_at = null;
+  gameState.countdown_target_at = null;
   gameState.is_paused = false;
   gameState.paused_at = null;
   gameState.stop_reason = null;
@@ -804,21 +936,29 @@ app.post('/api/admin/reset-match', requireAdmin, (req, res) => {
 
   db.resetAllPlayers();
   db.saveMatchState(gameState);
+  db.recordAuditLog({ matchId: gameState.match_id, action: 'MATCH_RESET', details: 'Reset match back to WAITING lobby.' });
 
   for (const p of players.values()) {
-    p.status = 'WAITING';
-    p.round_1_score = 0;
-    p.round_2_score = 0;
-    p.total_score = 0;
-    p.coins = 0;
-    p.completed_round_1 = false;
-    p.completed_round_2 = false;
-    p.round_1_moves = 0;
-    p.round_2_moves = 0;
-    p.round_1_time_ms = 0;
-    p.round_2_time_ms = 0;
-    p.shuffled_puzzle_r1 = generateShuffledArray(25);
-    p.shuffled_puzzle_r2 = generateShuffledArray(25);
+    if (p.player_status !== 'KICKED') {
+      p.status = 'WAITING';
+      p.game_status = 'WAITING';
+      p.player_status = 'LOBBY';
+      p.join_type = 'NORMAL';
+      p.admitted_by_admin = false;
+      p.admitted_at = null;
+      p.round_1_score = 0;
+      p.round_2_score = 0;
+      p.total_score = 0;
+      p.coins = 0;
+      p.completed_round_1 = false;
+      p.completed_round_2 = false;
+      p.round_1_moves = 0;
+      p.round_2_moves = 0;
+      p.round_1_time_ms = 0;
+      p.round_2_time_ms = 0;
+      p.shuffled_puzzle_r1 = generateShuffledArray(25);
+      p.shuffled_puzzle_r2 = generateShuffledArray(25);
+    }
   }
 
   processedRequests.clear();
@@ -836,9 +976,11 @@ app.post('/api/admin/end-match', requireAdmin, (req, res) => {
   gameState.status = 'COMPLETED';
   gameState.version++;
   db.saveMatchState(gameState);
+  db.recordAuditLog({ matchId: gameState.match_id, action: 'MATCH_ENDED', details: 'Admin ended match manually.' });
 
   for (const p of players.values()) {
-    if (p.status !== 'COMPLETED') {
+    if (p.player_status !== 'COMPLETED' && p.player_status !== 'KICKED') {
+      p.player_status = 'COMPLETED';
       p.status = 'COMPLETED';
     }
   }
@@ -849,7 +991,88 @@ app.post('/api/admin/end-match', requireAdmin, (req, res) => {
   res.json({ success: true, match_state: getPublicMatchState() });
 });
 
-// Remove / Kick Player
+// 7. ADMIT LATE PLAYER (Protected Emergency Action)
+app.post('/api/admin/admit-player', requireAdmin, (req, res) => {
+  const { player_id } = req.body;
+  if (!player_id) {
+    return res.status(400).json({ success: false, error: 'Player ID is required.' });
+  }
+
+  const updatedPlayer = db.admitPlayer(player_id);
+  if (!updatedPlayer) {
+    return res.status(404).json({ success: false, error: 'Player not found.' });
+  }
+
+  // Update in cache
+  for (const [token, p] of players.entries()) {
+    if (p.player_id === player_id || p.id === player_id) {
+      p.player_status = 'PLAYING';
+      p.status = 'PLAYING';
+      p.game_status = 'PLAYING';
+      p.admitted_by_admin = true;
+      p.admitted_at = Date.now();
+      break;
+    }
+  }
+
+  db.recordAuditLog({
+    matchId: gameState.match_id,
+    action: 'PLAYER_ADMITTED',
+    targetPlayerId: player_id,
+    details: 'Admitted into active match by administrator'
+  });
+
+  broadcastPlayersList();
+  broadcast('PLAYER_ADMITTED', {
+    player_id,
+    player: updatedPlayer,
+    current_round: gameState.current_round
+  });
+  broadcast('TOAST', { message: `${updatedPlayer.name} has been admitted to the match!` });
+
+  res.json({ success: true, player: updatedPlayer });
+});
+
+// 8. KICK PLAYER (Persistent with confirmation audit)
+app.post('/api/admin/kick-player', requireAdmin, (req, res) => {
+  const { player_id, reason } = req.body;
+  if (!player_id) {
+    return res.status(400).json({ success: false, error: 'Player ID is required.' });
+  }
+
+  const kickedPlayer = db.kickPlayer(player_id, reason || 'Removed by administrator');
+  if (!kickedPlayer) {
+    return res.status(404).json({ success: false, error: 'Player not found.' });
+  }
+
+  for (const [token, p] of players.entries()) {
+    if (p.player_id === player_id || p.id === player_id) {
+      p.player_status = 'KICKED';
+      p.status = 'KICKED';
+      p.game_status = 'KICKED';
+      p.connection_status = 'disconnected';
+      break;
+    }
+  }
+
+  db.recordAuditLog({
+    matchId: gameState.match_id,
+    action: 'PLAYER_KICKED',
+    targetPlayerId: player_id,
+    details: reason || 'Removed by administrator'
+  });
+
+  broadcastPlayersList();
+  broadcast('PLAYER_KICKED', {
+    player_id,
+    message: 'You have been removed from the match by an administrator.'
+  });
+  broadcast('TOAST', { message: `${kickedPlayer.name} was removed from the match` });
+
+  res.json({ success: true, player: kickedPlayer });
+});
+
+// Remove Player (Permanent Deletion)
 app.post('/api/admin/remove-player', requireAdmin, (req, res) => {
   const { player_id } = req.body;
   db.removePlayer(player_id);
@@ -865,7 +1088,7 @@ app.post('/api/admin/remove-player', requireAdmin, (req, res) => {
   res.status(404).json({ success: false, error: 'Player not found.' });
 });
 
-// Clear All Players (Wipe Dummy / Test Data)
+// Clear All Players
 app.post('/api/admin/clear-all-players', requireAdmin, (req, res) => {
   db.clearAllPlayers();
   players.clear();
@@ -895,9 +1118,9 @@ app.post('/api/admin/settings', requireAdmin, (req, res) => {
 // Export Results CSV
 app.get('/api/admin/export-csv', requireAdmin, (req, res) => {
   const allPlayers = db.getAllPlayers();
-  let csv = 'Rank,Player ID,Player Name,Mascot,Hat,Glasses,Outfit,Round 1 Score,Round 2 Score,Total Score,Coins,Status\n';
+  let csv = 'Rank,Player ID,Player Name,Mascot,Hat,Glasses,Outfit,Round 1 Score,Round 2 Score,Total Score,Coins,Status,Join Type,Admitted\n';
   allPlayers.forEach((p, idx) => {
-    csv += `${idx + 1},${p.player_id},"${p.name.replace(/"/g, '""')}",${p.animal_id},${p.hat_id},${p.glasses_id},${p.outfit_id},${p.round_1_score},${p.round_2_score},${p.total_score},${p.coins},${p.status}\n`;
+    csv += `${idx + 1},${p.player_id},"${p.name.replace(/"/g, '""')}",${p.animal_id},${p.hat_id},${p.glasses_id},${p.outfit_id},${p.round_1_score},${p.round_2_score},${p.total_score},${p.coins},${p.player_status || p.status},${p.join_type},${p.admitted_by_admin ? 'YES' : 'NO'}\n`;
   });
 
   res.setHeader('Content-Type', 'text/csv');
@@ -984,13 +1207,22 @@ wss.on('connection', (ws) => {
     }
   });
 
+  ws.on('error', (err) => {
+    console.error('WebSocket client error:', err.message);
+  });
+
   ws.on('close', () => {
     clients.delete(ws);
   });
+});
+
+wss.on('error', (err) => {
+  console.error('WebSocket server error:', err.message);
 });
 
 server.listen(PORT, () => {
   console.log(`🚀 Engineering Day Puzzle Challenge Server running on port ${PORT}`);
   console.log(`📡 WebSocket endpoint ready at ws://localhost:${PORT}/ws`);
   console.log(`🔑 Admin initial access code: ${ADMIN_CODE}`);
+  console.log(`🛡️ Emergency Admission Rejoin Code: ${EMERGENCY_REJOIN_CODE}`);
 });

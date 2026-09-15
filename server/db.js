@@ -15,7 +15,7 @@ if (!fs.existsSync(dataDir)) {
 const dbPath = path.join(dataDir, 'engineering_day.db');
 const db = new Database(dbPath);
 
-// Enable WAL mode for high concurrency (handles 40+ simultaneous players smoothly)
+// Enable WAL mode for high concurrency
 db.pragma('journal_mode = WAL');
 db.pragma('synchronous = NORMAL');
 
@@ -44,6 +44,12 @@ db.exec(`
     round_1_time_ms INTEGER NOT NULL DEFAULT 0,
     round_2_time_ms INTEGER NOT NULL DEFAULT 0,
     game_status TEXT NOT NULL DEFAULT 'WAITING',
+    player_status TEXT NOT NULL DEFAULT 'LOBBY',
+    join_type TEXT NOT NULL DEFAULT 'NORMAL',
+    admitted_by_admin INTEGER NOT NULL DEFAULT 0,
+    admitted_at INTEGER,
+    round_1_reward_claimed INTEGER NOT NULL DEFAULT 0,
+    round_2_reward_claimed INTEGER NOT NULL DEFAULT 0,
     connection_status TEXT NOT NULL DEFAULT 'connected',
     session_token TEXT UNIQUE NOT NULL,
     shuffled_puzzle_r1 TEXT NOT NULL,
@@ -78,6 +84,8 @@ db.exec(`
     round_1_end_at INTEGER,
     round_2_start_at INTEGER,
     round_2_end_at INTEGER,
+    countdown_start_at INTEGER,
+    countdown_target_at INTEGER,
     is_paused INTEGER NOT NULL DEFAULT 0,
     paused_at INTEGER,
     total_paused_ms INTEGER NOT NULL DEFAULT 0,
@@ -85,27 +93,73 @@ db.exec(`
     version INTEGER NOT NULL DEFAULT 1,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS coin_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    player_id TEXT NOT NULL,
+    match_id TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    transaction_type TEXT NOT NULL,
+    description TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    created_at_iso TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_coin_tx_player ON coin_transactions(player_id);
+
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    target_player_id TEXT,
+    details TEXT,
+    created_at INTEGER NOT NULL,
+    created_at_iso TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_audit_match ON audit_logs(match_id);
 `);
 
-// Prepared statements for high performance
+// Safe incremental migrations for existing DBs
+function safeAddColumn(table, columnDef) {
+  try {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+  } catch (e) {
+    // column likely already exists
+  }
+}
+
+safeAddColumn('players', "player_status TEXT NOT NULL DEFAULT 'LOBBY'");
+safeAddColumn('players', "join_type TEXT NOT NULL DEFAULT 'NORMAL'");
+safeAddColumn('players', "admitted_by_admin INTEGER NOT NULL DEFAULT 0");
+safeAddColumn('players', "admitted_at INTEGER");
+safeAddColumn('players', "round_1_reward_claimed INTEGER NOT NULL DEFAULT 0");
+safeAddColumn('players', "round_2_reward_claimed INTEGER NOT NULL DEFAULT 0");
+safeAddColumn('match_state', "countdown_start_at INTEGER");
+safeAddColumn('match_state', "countdown_target_at INTEGER");
+
+// Prepared Statements
 const insertPlayerStmt = db.prepare(`
   INSERT INTO players (
     player_id, username, username_normalized, animal_id, hat_id, glasses_id, outfit_id,
     avatar_config, score, coins, current_round, puzzle_completed, round_1_completed, round_2_completed,
     round_1_score, round_2_score, round_1_moves, round_2_moves, round_1_time_ms, round_2_time_ms,
-    game_status, connection_status, session_token, shuffled_puzzle_r1, shuffled_puzzle_r2,
+    game_status, player_status, join_type, admitted_by_admin, admitted_at,
+    round_1_reward_claimed, round_2_reward_claimed,
+    connection_status, session_token, shuffled_puzzle_r1, shuffled_puzzle_r2,
     joined_at, last_seen_at, created_at, updated_at
   ) VALUES (
     @player_id, @username, @username_normalized, @animal_id, @hat_id, @glasses_id, @outfit_id,
     @avatar_config, @score, @coins, @current_round, @puzzle_completed, @round_1_completed, @round_2_completed,
     @round_1_score, @round_2_score, @round_1_moves, @round_2_moves, @round_1_time_ms, @round_2_time_ms,
-    @game_status, @connection_status, @session_token, @shuffled_puzzle_r1, @shuffled_puzzle_r2,
+    @game_status, @player_status, @join_type, @admitted_by_admin, @admitted_at,
+    @round_1_reward_claimed, @round_2_reward_claimed,
+    @connection_status, @session_token, @shuffled_puzzle_r1, @shuffled_puzzle_r2,
     @joined_at, @last_seen_at, @created_at, @updated_at
   )
 `);
 
 const getPlayerByTokenStmt = db.prepare(`SELECT * FROM players WHERE session_token = ?`);
 const getPlayerByNormalizedNameStmt = db.prepare(`SELECT * FROM players WHERE username_normalized = ?`);
+const getPlayerByIdStmt = db.prepare(`SELECT * FROM players WHERE player_id = ? OR id = ?`);
 const countPlayersStmt = db.prepare(`SELECT COUNT(*) as count FROM players`);
 const maxIdStmt = db.prepare(`SELECT COALESCE(MAX(id), 0) as max_id FROM players`);
 
@@ -124,19 +178,32 @@ const updateAvatarStmt = db.prepare(`
 
 const updateStatusStmt = db.prepare(`
   UPDATE players
-  SET game_status = ?, updated_at = ?
+  SET game_status = ?, player_status = ?, updated_at = ?
   WHERE session_token = ?
 `);
 
 const updateAllPlayersStatusStmt = db.prepare(`
   UPDATE players
-  SET game_status = ?, updated_at = ?
-  WHERE round_2_completed = 0
+  SET game_status = ?, player_status = ?, updated_at = ?
+  WHERE round_2_completed = 0 AND player_status != 'KICKED' AND player_status != 'SPECTATOR'
+`);
+
+const admitPlayerStmt = db.prepare(`
+  UPDATE players
+  SET player_status = 'PLAYING', game_status = 'PLAYING', admitted_by_admin = 1, admitted_at = ?, updated_at = ?
+  WHERE player_id = ? OR id = ?
+`);
+
+const kickPlayerStmt = db.prepare(`
+  UPDATE players
+  SET player_status = 'KICKED', game_status = 'KICKED', connection_status = 'disconnected', updated_at = ?
+  WHERE player_id = ? OR id = ?
 `);
 
 const updateRound1CompletionStmt = db.prepare(`
   UPDATE players 
   SET round_1_completed = 1,
+      round_1_reward_claimed = 1,
       round_1_score = @awarded_score,
       round_1_moves = @moves,
       round_1_time_ms = @solve_time_ms,
@@ -144,6 +211,7 @@ const updateRound1CompletionStmt = db.prepare(`
       coins = coins + @coins_earned,
       current_round = 2,
       game_status = 'ROUND_1_COMPLETE',
+      player_status = 'PLAYING',
       updated_at = @updated_at
   WHERE session_token = @session_token AND round_1_completed = 0
 `);
@@ -151,6 +219,7 @@ const updateRound1CompletionStmt = db.prepare(`
 const updateRound2CompletionStmt = db.prepare(`
   UPDATE players 
   SET round_2_completed = 1,
+      round_2_reward_claimed = 1,
       puzzle_completed = 1,
       round_2_score = @awarded_score,
       round_2_moves = @moves,
@@ -158,6 +227,7 @@ const updateRound2CompletionStmt = db.prepare(`
       score = score + @awarded_score,
       coins = coins + @coins_earned,
       game_status = 'COMPLETED',
+      player_status = 'COMPLETED',
       completed_at = @now,
       updated_at = @updated_at
   WHERE session_token = @session_token AND round_2_completed = 0
@@ -165,7 +235,7 @@ const updateRound2CompletionStmt = db.prepare(`
 
 const advanceRound2Stmt = db.prepare(`
   UPDATE players
-  SET current_round = 2, game_status = 'PLAYING', updated_at = ?
+  SET current_round = 2, game_status = 'PLAYING', player_status = 'PLAYING', updated_at = ?
   WHERE session_token = ?
 `);
 
@@ -174,10 +244,30 @@ const resetAllPlayersStmt = db.prepare(`
   SET score = 0, coins = 0, current_round = 1, puzzle_completed = 0,
       round_1_completed = 0, round_2_completed = 0, round_1_score = 0, round_2_score = 0,
       round_1_moves = 0, round_2_moves = 0, round_1_time_ms = 0, round_2_time_ms = 0,
-      game_status = 'WAITING', completed_at = NULL, updated_at = ?
+      game_status = 'WAITING', player_status = 'LOBBY', join_type = 'NORMAL',
+      admitted_by_admin = 0, admitted_at = NULL,
+      round_1_reward_claimed = 0, round_2_reward_claimed = 0,
+      completed_at = NULL, updated_at = ?
+  WHERE player_status != 'KICKED'
 `);
 
 const deletePlayerStmt = db.prepare(`DELETE FROM players WHERE player_id = ? OR id = ?`);
+
+const insertCoinTransactionStmt = db.prepare(`
+  INSERT INTO coin_transactions (
+    player_id, match_id, amount, transaction_type, description, created_at, created_at_iso
+  ) VALUES (
+    @player_id, @match_id, @amount, @transaction_type, @description, @created_at, @created_at_iso
+  )
+`);
+
+const insertAuditLogStmt = db.prepare(`
+  INSERT INTO audit_logs (
+    match_id, action, target_player_id, details, created_at, created_at_iso
+  ) VALUES (
+    @match_id, @action, @target_player_id, @details, @created_at, @created_at_iso
+  )
+`);
 
 // Helper to format player object from DB row
 function formatPlayerRow(row) {
@@ -198,8 +288,14 @@ function formatPlayerRow(row) {
     score: row.score,
     coins: row.coins,
     current_round: row.current_round,
-    status: row.game_status,
+    status: row.player_status || row.game_status,
     game_status: row.game_status,
+    player_status: row.player_status || row.game_status,
+    join_type: row.join_type || 'NORMAL',
+    admitted_by_admin: Boolean(row.admitted_by_admin),
+    admitted_at: row.admitted_at,
+    round_1_reward_claimed: Boolean(row.round_1_reward_claimed),
+    round_2_reward_claimed: Boolean(row.round_2_reward_claimed),
     connection_status: row.connection_status,
     session_token: row.session_token,
     completed_round_1: Boolean(row.round_1_completed),
@@ -218,7 +314,6 @@ function formatPlayerRow(row) {
   };
 }
 
-// Generate sequential Player ID (e.g. ENG-0001)
 export function generateNextPlayerId() {
   const { max_id } = maxIdStmt.get();
   const nextNumber = Number(max_id) + 1;
@@ -242,12 +337,14 @@ export function createPlayerRecord({
   session_token,
   shuffled_puzzle_r1,
   shuffled_puzzle_r2,
-  game_status = 'WAITING'
+  game_status = 'WAITING',
+  player_status = 'LOBBY',
+  join_type = 'NORMAL',
+  admitted_by_admin = 0
 }) {
   const cleanName = username.trim();
   const normalized = cleanName.toLowerCase();
 
-  // Atomically check uniqueness and generate next ID inside an immediate transaction
   const tx = db.transaction(() => {
     const existing = getPlayerByNormalizedNameStmt.get(normalized);
     if (existing) {
@@ -292,6 +389,12 @@ export function createPlayerRecord({
       round_1_time_ms: 0,
       round_2_time_ms: 0,
       game_status,
+      player_status,
+      join_type,
+      admitted_by_admin,
+      admitted_at: admitted_by_admin ? now : null,
+      round_1_reward_claimed: 0,
+      round_2_reward_claimed: 0,
       connection_status: 'connected',
       session_token,
       shuffled_puzzle_r1: JSON.stringify(shuffled_puzzle_r1),
@@ -318,6 +421,12 @@ export function getPlayerByToken(sessionToken) {
 export function getPlayerByUsername(username) {
   if (!username) return null;
   const row = getPlayerByNormalizedNameStmt.get(username.trim().toLowerCase());
+  return formatPlayerRow(row);
+}
+
+export function getPlayerById(playerId) {
+  if (!playerId) return null;
+  const row = getPlayerByIdStmt.get(playerId, playerId);
   return formatPlayerRow(row);
 }
 
@@ -356,11 +465,11 @@ export function recordHeartbeat(sessionToken) {
 }
 
 export function updatePlayerStatus(sessionToken, status) {
-  updateStatusStmt.run(status, new Date().toISOString(), sessionToken);
+  updateStatusStmt.run(status, status, new Date().toISOString(), sessionToken);
 }
 
 export function updateAllActivePlayersStatus(status) {
-  updateAllPlayersStatusStmt.run(status, new Date().toISOString());
+  updateAllPlayersStatusStmt.run(status, status, new Date().toISOString());
 }
 
 export function advancePlayerToRound2(sessionToken) {
@@ -368,43 +477,160 @@ export function advancePlayerToRound2(sessionToken) {
   return getPlayerByToken(sessionToken);
 }
 
-export function completeRound({ sessionToken, roundNumber, awardedScore, coinsEarned, moves, solveTimeMs }) {
+export function admitPlayer(playerId) {
+  const now = Date.now();
+  const isoDate = new Date().toISOString();
+  admitPlayerStmt.run(now, isoDate, playerId, playerId);
+  return getPlayerById(playerId);
+}
+
+export function kickPlayer(playerId, reason = 'Kicked by administrator') {
+  const isoDate = new Date().toISOString();
+  kickPlayerStmt.run(isoDate, playerId, playerId);
+  return getPlayerById(playerId);
+}
+
+export function completeRound({
+  sessionToken,
+  roundNumber,
+  awardedScore,
+  moves,
+  solveTimeMs,
+  matchId = 'match-eng-2026-01'
+}) {
   const now = Date.now();
   const isoDate = new Date().toISOString();
 
-  if (roundNumber === 1) {
-    const res = updateRound1CompletionStmt.run({
-      awarded_score: awardedScore,
-      coins_earned: coinsEarned,
-      moves,
-      solve_time_ms: solveTimeMs,
-      updated_at: isoDate,
-      session_token: sessionToken
+  // Authoritative Reward amounts: +100 for Round 1, +200 for Round 2
+  const coinsEarned = roundNumber === 1 ? 100 : 200;
+  const transactionType = roundNumber === 1 ? 'PUZZLE_ROUND_1' : 'PUZZLE_ROUND_2';
+  const description = `Completed Round ${roundNumber}`;
+
+  const tx = db.transaction(() => {
+    const playerRow = getPlayerByTokenStmt.get(sessionToken);
+    if (!playerRow) return { updated: false, alreadyClaimed: false, player: null };
+
+    // Idempotency: Prevent duplicate points or coin claims
+    if (roundNumber === 1 && playerRow.round_1_reward_claimed === 1) {
+      return { updated: false, alreadyClaimed: true, player: formatPlayerRow(playerRow) };
+    }
+    if (roundNumber === 2 && playerRow.round_2_reward_claimed === 1) {
+      return { updated: false, alreadyClaimed: true, player: formatPlayerRow(playerRow) };
+    }
+
+    if (roundNumber === 1) {
+      updateRound1CompletionStmt.run({
+        awarded_score: awardedScore,
+        coins_earned: coinsEarned,
+        moves,
+        solve_time_ms: solveTimeMs,
+        updated_at: isoDate,
+        session_token: sessionToken
+      });
+    } else {
+      updateRound2CompletionStmt.run({
+        awarded_score: awardedScore,
+        coins_earned: coinsEarned,
+        moves,
+        solve_time_ms: solveTimeMs,
+        now,
+        updated_at: isoDate,
+        session_token: sessionToken
+      });
+    }
+
+    // Insert authoritative ledger entry into coin_transactions
+    insertCoinTransactionStmt.run({
+      player_id: playerRow.player_id,
+      match_id: matchId,
+      amount: coinsEarned,
+      transaction_type: transactionType,
+      description,
+      created_at: now,
+      created_at_iso: isoDate
     });
-    const updated = res.changes > 0;
-    return { updated, player: getPlayerByToken(sessionToken) };
-  } else {
-    const res = updateRound2CompletionStmt.run({
-      awarded_score: awardedScore,
-      coins_earned: coinsEarned,
-      moves,
-      solve_time_ms: solveTimeMs,
-      now,
-      updated_at: isoDate,
-      session_token: sessionToken
-    });
-    const updated = res.changes > 0;
-    return { updated, player: getPlayerByToken(sessionToken) };
+
+    const updatedRow = getPlayerByTokenStmt.get(sessionToken);
+    return { updated: true, alreadyClaimed: false, player: formatPlayerRow(updatedRow) };
+  });
+
+  return tx();
+}
+
+export function recordCoinTransaction({ playerId, matchId, amount, transactionType, description }) {
+  const now = Date.now();
+  const isoDate = new Date().toISOString();
+  insertCoinTransactionStmt.run({
+    player_id: playerId,
+    match_id: matchId || 'match-eng-2026-01',
+    amount,
+    transaction_type: transactionType,
+    description,
+    created_at: now,
+    created_at_iso: isoDate
+  });
+}
+
+export function recordAuditLog({ matchId, action, targetPlayerId = null, details = null }) {
+  const now = Date.now();
+  const isoDate = new Date().toISOString();
+  insertAuditLogStmt.run({
+    match_id: matchId || 'match-eng-2026-01',
+    action,
+    target_player_id: targetPlayerId,
+    details: details ? (typeof details === 'string' ? details : JSON.stringify(details)) : null,
+    created_at: now,
+    created_at_iso: isoDate
+  });
+}
+
+export function getCoinTransactions(playerId = null) {
+  if (playerId) {
+    return db.prepare(`SELECT * FROM coin_transactions WHERE player_id = ? ORDER BY created_at DESC`).all(playerId);
   }
+  return db.prepare(`SELECT * FROM coin_transactions ORDER BY created_at DESC LIMIT 200`).all();
+}
+
+export function getAuditLogs() {
+  return db.prepare(`SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 200`).all();
 }
 
 export function getAllPlayers() {
-  const rows = db.prepare(`SELECT * FROM players ORDER BY score DESC, round_2_completed DESC, round_1_completed DESC, joined_at ASC`).all();
+  const rows = db.prepare(`
+    SELECT * FROM players 
+    ORDER BY score DESC, round_2_completed DESC, round_1_completed DESC, joined_at ASC
+  `).all();
+  return rows.map(formatPlayerRow);
+}
+
+export function getLateJoiners() {
+  const rows = db.prepare(`
+    SELECT * FROM players 
+    WHERE join_type = 'LATE' AND player_status != 'KICKED'
+    ORDER BY joined_at ASC
+  `).all();
+  return rows.map(formatPlayerRow);
+}
+
+export function getKickedPlayers() {
+  const rows = db.prepare(`
+    SELECT * FROM players 
+    WHERE player_status = 'KICKED'
+    ORDER BY updated_at DESC
+  `).all();
   return rows.map(formatPlayerRow);
 }
 
 export function getPlayerCount() {
   const { count } = countPlayersStmt.get();
+  return Number(count);
+}
+
+export function getActiveLobbyPlayerCount() {
+  const { count } = db.prepare(`
+    SELECT COUNT(*) as count FROM players 
+    WHERE player_status != 'KICKED' AND (join_type = 'NORMAL' OR admitted_by_admin = 1)
+  `).get();
   return Number(count);
 }
 
@@ -418,8 +644,9 @@ export function removePlayer(playerId) {
 
 export function clearAllPlayers() {
   db.prepare('DELETE FROM players').run();
+  db.prepare('DELETE FROM coin_transactions').run();
   try {
-    db.prepare("DELETE FROM sqlite_sequence WHERE name = 'players'").run();
+    db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('players', 'coin_transactions')").run();
   } catch (e) {
     // ignore
   }
@@ -432,14 +659,14 @@ export function saveMatchState(state) {
       id, match_id, event_title, event_subtitle, match_code, status, previous_status,
       current_round, max_players, round_1_duration_seconds, round_2_duration_seconds,
       match_duration_seconds, match_start_time, match_end_time, round_1_start_at,
-      round_1_end_at, round_2_start_at, round_2_end_at, is_paused, paused_at,
-      total_paused_ms, stop_reason, version, updated_at
+      round_1_end_at, round_2_start_at, round_2_end_at, countdown_start_at, countdown_target_at,
+      is_paused, paused_at, total_paused_ms, stop_reason, version, updated_at
     ) VALUES (
       1, @match_id, @event_title, @event_subtitle, @match_code, @status, @previous_status,
       @current_round, @max_players, @round_1_duration_seconds, @round_2_duration_seconds,
       @match_duration_seconds, @match_start_time, @match_end_time, @round_1_start_at,
-      @round_1_end_at, @round_2_start_at, @round_2_end_at, @is_paused, @paused_at,
-      @total_paused_ms, @stop_reason, @version, @updated_at
+      @round_1_end_at, @round_2_start_at, @round_2_end_at, @countdown_start_at, @countdown_target_at,
+      @is_paused, @paused_at, @total_paused_ms, @stop_reason, @version, @updated_at
     )
     ON CONFLICT (id) DO UPDATE SET
       status = EXCLUDED.status,
@@ -451,6 +678,8 @@ export function saveMatchState(state) {
       round_1_end_at = EXCLUDED.round_1_end_at,
       round_2_start_at = EXCLUDED.round_2_start_at,
       round_2_end_at = EXCLUDED.round_2_end_at,
+      countdown_start_at = EXCLUDED.countdown_start_at,
+      countdown_target_at = EXCLUDED.countdown_target_at,
       is_paused = EXCLUDED.is_paused,
       paused_at = EXCLUDED.paused_at,
       total_paused_ms = EXCLUDED.total_paused_ms,
@@ -477,6 +706,8 @@ export function saveMatchState(state) {
     round_1_end_at: state.round_1_end_at || null,
     round_2_start_at: state.round_2_start_at || null,
     round_2_end_at: state.round_2_end_at || null,
+    countdown_start_at: state.countdown_start_at || null,
+    countdown_target_at: state.countdown_target_at || null,
     is_paused: state.is_paused ? 1 : 0,
     paused_at: state.paused_at || null,
     total_paused_ms: state.total_paused_ms || 0,
@@ -507,6 +738,8 @@ export function loadMatchState() {
     round_1_end_at: row.round_1_end_at,
     round_2_start_at: row.round_2_start_at,
     round_2_end_at: row.round_2_end_at,
+    countdown_start_at: row.countdown_start_at,
+    countdown_target_at: row.countdown_target_at,
     is_paused: Boolean(row.is_paused),
     paused_at: row.paused_at,
     total_paused_ms: row.total_paused_ms,

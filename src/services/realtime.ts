@@ -2,7 +2,7 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../utils/supabase';
 import { MatchState, Player } from '../types/game';
 
-const CHANNEL_NAME = 'engineering-day-challenge';
+const SUPABASE_CHANNEL_NAME = 'engineering-day-challenge';
 const MATCH_STATE_STORAGE_KEY = 'eng_match_state_cache';
 
 export interface RealtimeHandlers {
@@ -10,15 +10,17 @@ export interface RealtimeHandlers {
   onMatchStateChange: (state: MatchState) => void;
   onPlayersListChange: (players: Player[]) => void;
   onToast: (message: string) => void;
-  onCountdown: () => void;
-  onPlayerKicked?: (playerId: string) => void;
+  onCountdown: (data?: { countdown_start_at?: number; countdown_target_at?: number; server_now?: number }) => void;
+  onPlayerKicked?: (playerId: string, reason?: string) => void;
+  onPlayerAdmitted?: (data: { player_id: string; player: Player; current_round: number }) => void;
 }
 
-let channel: RealtimeChannel | null = null;
+let nativeWs: WebSocket | null = null;
+let sbChannel: RealtimeChannel | null = null;
 let currentTrackingPlayer: Player | null = null;
 let activeHandlers: RealtimeHandlers | null = null;
+let wsReconnectTimer: any = null;
 
-// Initial Default Match State
 export function getDefaultMatchState(): MatchState {
   try {
     const cached = localStorage.getItem(MATCH_STATE_STORAGE_KEY);
@@ -31,7 +33,7 @@ export function getDefaultMatchState(): MatchState {
   }
 
   return {
-    match_id: 'match-eng-2026-01',
+    match_id: 'MATCH-0001',
     event_title: 'ENGINEERING DAY',
     event_subtitle: 'PUZZLE CHALLENGE',
     match_code: 'ENGDAY26',
@@ -47,6 +49,8 @@ export function getDefaultMatchState(): MatchState {
     round_2_end_at: null,
     match_start_time: null,
     match_end_time: null,
+    countdown_start_at: null,
+    countdown_target_at: null,
     is_paused: false,
     paused_at: null,
     version: 1,
@@ -64,278 +68,201 @@ export function saveCachedMatchState(state: MatchState) {
 }
 
 /**
- * Initialize unified Supabase Realtime channel.
- * Connects all clients across Netlify, mobile, and desktops to ONE global room.
+ * Connect to primary server-authoritative native WebSocket endpoint
+ */
+function connectNativeWebSocket(handlers: RealtimeHandlers) {
+  if (nativeWs && (nativeWs.readyState === WebSocket.OPEN || nativeWs.readyState === WebSocket.CONNECTING)) {
+    return;
+  }
+
+  // Determine WebSocket URL: use relative /ws (handled by Vite proxy) or fallback
+  const isHttps = window.location.protocol === 'https:';
+  const wsProto = isHttps ? 'wss:' : 'ws:';
+  let wsUrl = `${wsProto}//${window.location.host}/ws`;
+
+  // If in dev and vite proxy is localhost:5173, /ws proxies to 3001
+  try {
+    nativeWs = new WebSocket(wsUrl);
+
+    nativeWs.onopen = () => {
+      console.log('📡 Connected to Server Native WebSocket at', wsUrl);
+      handlers.onConnectionChange(true);
+      if (currentTrackingPlayer) {
+        nativeWs?.send(JSON.stringify({
+          type: 'IDENTIFY',
+          session_token: currentTrackingPlayer.session_token
+        }));
+      }
+    };
+
+    nativeWs.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (!data || !data.type) return;
+
+        switch (data.type) {
+          case 'INIT_SYNC':
+            if (data.payload?.match_state) {
+              saveCachedMatchState(data.payload.match_state);
+              handlers.onMatchStateChange(data.payload.match_state);
+            }
+            break;
+
+          case 'MATCH_STATE_UPDATE':
+            if (data.payload) {
+              saveCachedMatchState(data.payload);
+              handlers.onMatchStateChange(data.payload);
+            }
+            break;
+
+          case 'MATCH_COUNTDOWN':
+            handlers.onCountdown(data.payload);
+            break;
+
+          case 'MATCH_STARTED':
+            handlers.onToast('Match started! Round 1 is live!');
+            break;
+
+          case 'MATCH_STOPPED':
+            handlers.onToast(data.payload?.message || 'Match stopped by administrator');
+            break;
+
+          case 'MATCH_RESET':
+            handlers.onToast('Match has been reset by organizer');
+            break;
+
+          case 'PLAYERS_LIST_UPDATE':
+            if (data.payload?.players) {
+              handlers.onPlayersListChange(data.payload.players);
+            }
+            break;
+
+          case 'PLAYER_ADMITTED':
+            if (handlers.onPlayerAdmitted && data.payload) {
+              handlers.onPlayerAdmitted(data.payload);
+            }
+            break;
+
+          case 'PLAYER_KICKED':
+            if (handlers.onPlayerKicked && data.payload?.player_id) {
+              handlers.onPlayerKicked(data.payload.player_id, data.payload?.reason);
+            }
+            break;
+
+          case 'TOAST':
+            if (data.payload?.message) {
+              handlers.onToast(data.payload.message);
+            }
+            break;
+        }
+      } catch (e) {
+        console.error('Error parsing WebSocket message:', e);
+      }
+    };
+
+    nativeWs.onerror = (err) => {
+      console.warn('Native WebSocket error:', err);
+    };
+
+    nativeWs.onclose = () => {
+      console.log('Native WebSocket disconnected, retrying in 3s...');
+      nativeWs = null;
+      handlers.onConnectionChange(false);
+      clearTimeout(wsReconnectTimer);
+      wsReconnectTimer = setTimeout(() => {
+        if (activeHandlers) connectNativeWebSocket(activeHandlers);
+      }, 3000);
+    };
+  } catch (e) {
+    console.warn('Failed to establish Native WebSocket connection:', e);
+  }
+}
+
+/**
+ * Initialize unified dual-engine Realtime.
+ * Primary: Native WebSocket to Express server.
+ * Secondary: Supabase Realtime channel fallback.
  */
 export function initRealtime(handlers: RealtimeHandlers) {
   activeHandlers = handlers;
 
-  // Clean up any existing channel
-  if (channel) {
-    supabase.removeChannel(channel);
-    channel = null;
+  // 1. Connect Primary Native WebSocket
+  connectNativeWebSocket(handlers);
+
+  // 2. Connect Secondary Supabase Realtime channel (Dual sync)
+  try {
+    if (sbChannel) {
+      supabase.removeChannel(sbChannel);
+      sbChannel = null;
+    }
+
+    const newChannel = supabase.channel(SUPABASE_CHANNEL_NAME, {
+      config: {
+        broadcast: { self: true },
+        presence: { key: currentTrackingPlayer?.session_token || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}` }
+      }
+    });
+
+    newChannel
+      .on('broadcast', { event: 'MATCH_STATE_UPDATE' }, (event) => {
+        if (event.payload) {
+          saveCachedMatchState(event.payload);
+          handlers.onMatchStateChange(event.payload);
+        }
+      })
+      .on('broadcast', { event: 'MATCH_COUNTDOWN' }, (event) => {
+        handlers.onCountdown(event.payload);
+      })
+      .on('broadcast', { event: 'PLAYER_ADMITTED' }, (event) => {
+        if (handlers.onPlayerAdmitted && event.payload) {
+          handlers.onPlayerAdmitted(event.payload);
+        }
+      })
+      .on('broadcast', { event: 'PLAYER_KICKED' }, (event) => {
+        if (handlers.onPlayerKicked && event.payload?.player_id) {
+          handlers.onPlayerKicked(event.payload.player_id, event.payload?.reason);
+        }
+      })
+      .on('broadcast', { event: 'TOAST' }, (event) => {
+        if (event.payload?.message) {
+          handlers.onToast(event.payload.message);
+        }
+      });
+
+    newChannel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        handlers.onConnectionChange(true);
+      }
+    });
+
+    sbChannel = newChannel;
+  } catch (err) {
+    console.warn('Supabase Realtime fallback notice:', err);
   }
 
-  const newChannel = supabase.channel(CHANNEL_NAME, {
-    config: {
-      broadcast: { self: true },
-      presence: { key: currentTrackingPlayer?.session_token || `guest_${Date.now()}_${Math.random().toString(36).substring(2, 7)}` }
-    }
-  });
-
-  // 1. PRESENCE TRACKING: Synchronizes live players across all devices
-  newChannel.on('presence', { event: 'sync' }, () => {
-    const presenceState = newChannel.presenceState();
-    const livePlayers: Player[] = [];
-    const seenIds = new Set<string>();
-
-    for (const key of Object.keys(presenceState)) {
-      const items = presenceState[key] as any[];
-      if (items && items.length > 0) {
-        const p = items[items.length - 1];
-        if (p && p.name && !seenIds.has(p.player_id || key)) {
-          seenIds.add(p.player_id || key);
-          livePlayers.push({
-            id: p.id || p.player_id || key,
-            player_id: p.player_id || p.id || key,
-            name: p.name,
-            animal_id: p.animal_id || 'fox',
-            hat_id: p.hat_id || 'none',
-            glasses_id: 'none',
-            outfit_id: 'none',
-            total_score: Number(p.total_score) || 0,
-            coins: Number(p.coins) || 0,
-            current_round: p.current_round || 1,
-            status: p.status || 'WAITING',
-            connection_status: 'connected',
-            session_token: key,
-            joined_at: Number(p.joined_at) || Date.now(),
-            last_seen_at: Date.now(),
-            round_1_score: Number(p.round_1_score) || 0,
-            round_2_score: Number(p.round_2_score) || 0,
-            completed_round_1: Boolean(p.completed_round_1),
-            completed_round_2: Boolean(p.completed_round_2),
-            round_1_moves: p.round_1_moves || 0,
-            round_2_moves: p.round_2_moves || 0,
-            round_1_time_ms: p.round_1_time_ms || 0,
-            round_2_time_ms: p.round_2_time_ms || 0,
-            shuffled_puzzle_r1: p.shuffled_puzzle_r1,
-            shuffled_puzzle_r2: p.shuffled_puzzle_r2,
-            current_board: p.current_board,
-            correct_pieces_count: p.correct_pieces_count
-          } as Player);
-        }
-      }
-    }
-
-    // Sort players: highest score first, then earliest join
-    livePlayers.sort((a, b) => {
-      if (b.total_score !== a.total_score) return b.total_score - a.total_score;
-      return a.joined_at - b.joined_at;
-    });
-
-    handlers.onPlayersListChange(livePlayers);
-  });
-
-  // 2. BROADCAST: Match state machine updates across all connected devices
-  newChannel
-    .on('broadcast', { event: 'MATCH_STATE_UPDATE' }, (event) => {
-      if (event.payload) {
-        saveCachedMatchState(event.payload);
-        handlers.onMatchStateChange(event.payload);
-      }
-    })
-    .on('broadcast', { event: 'MATCH_STARTED' }, () => {
-      handlers.onCountdown();
-    })
-    .on('broadcast', { event: 'MATCH_STOPPED' }, (event) => {
-      handlers.onToast(event.payload?.message || 'Match stopped by administrator');
-    })
-    .on('broadcast', { event: 'MATCH_RESET' }, () => {
-      handlers.onToast('Match progress has been reset by organizer');
-    })
-    .on('broadcast', { event: 'TOAST' }, (event) => {
-      if (event.payload?.message) {
-        handlers.onToast(event.payload.message);
-      }
-    })
-    .on('broadcast', { event: 'PLAYER_KICKED' }, (event) => {
-      if (handlers.onPlayerKicked && event.payload?.player_id) {
-        handlers.onPlayerKicked(event.payload.player_id);
-      }
-    });
-
-  // Subscribe to channel
-  newChannel.subscribe(async (status) => {
-    if (status === 'SUBSCRIBED') {
-      handlers.onConnectionChange(true);
-      if (currentTrackingPlayer) {
-        await trackPlayerPresence(currentTrackingPlayer);
-      }
-    } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-      handlers.onConnectionChange(false);
-    }
-  });
-
-  channel = newChannel;
-
   return () => {
-    if (channel) {
-      supabase.removeChannel(channel);
-      channel = null;
+    if (nativeWs) {
+      nativeWs.close();
+      nativeWs = null;
+    }
+    clearTimeout(wsReconnectTimer);
+    if (sbChannel) {
+      supabase.removeChannel(sbChannel);
+      sbChannel = null;
     }
   };
 }
 
-/**
- * Track or update player presence in the global room
- */
-export async function trackPlayerPresence(player: Player) {
+export function trackPlayerPresence(player: Player) {
   currentTrackingPlayer = player;
-  if (channel) {
-    try {
-      await channel.track({
-        id: player.id,
-        player_id: player.player_id,
-        name: player.name,
-        animal_id: player.animal_id,
-        hat_id: player.hat_id,
-        status: player.status,
-        total_score: player.total_score,
-        coins: player.coins,
-        current_round: player.current_round,
-        completed_round_1: player.completed_round_1,
-        completed_round_2: player.completed_round_2,
-        round_1_score: player.round_1_score,
-        round_2_score: player.round_2_score,
-        round_1_moves: player.round_1_moves,
-        round_2_moves: player.round_2_moves,
-        round_1_time_ms: player.round_1_time_ms,
-        round_2_time_ms: player.round_2_time_ms,
-        joined_at: player.joined_at,
-        shuffled_puzzle_r1: player.shuffled_puzzle_r1,
-        shuffled_puzzle_r2: player.shuffled_puzzle_r2,
-        current_board: player.current_board,
-        correct_pieces_count: player.correct_pieces_count,
-        connection_status: 'connected'
-      });
-    } catch (e) {
-      console.warn('Failed to track player presence:', e);
-    }
+  if (nativeWs && nativeWs.readyState === WebSocket.OPEN) {
+    nativeWs.send(JSON.stringify({
+      type: 'IDENTIFY',
+      session_token: player.session_token
+    }));
   }
 }
 
-/**
- * Remove active player from room presence
- */
-export async function untrackPlayerPresence() {
+export function untrackPlayerPresence() {
   currentTrackingPlayer = null;
-  if (channel) {
-    try {
-      await channel.untrack();
-    } catch (e) {
-      console.warn('Failed to untrack player presence:', e);
-    }
-  }
-}
-
-/**
- * Broadcast match state to all connected players
- */
-export async function broadcastMatchState(state: MatchState) {
-  saveCachedMatchState(state);
-  if (channel) {
-    try {
-      await channel.send({
-        type: 'broadcast',
-        event: 'MATCH_STATE_UPDATE',
-        payload: state
-      });
-    } catch (e) {
-      console.warn('Failed to broadcast match state:', e);
-    }
-  }
-}
-
-/**
- * Broadcast 3-2-1 match start trigger to all devices
- */
-export async function broadcastStartMatch() {
-  if (channel) {
-    try {
-      await channel.send({
-        type: 'broadcast',
-        event: 'MATCH_STARTED'
-      });
-    } catch (e) {
-      console.warn('Failed to broadcast match start:', e);
-    }
-  }
-}
-
-/**
- * Broadcast match stopped event
- */
-export async function broadcastStopMatch(message = 'Match stopped by administrator') {
-  if (channel) {
-    try {
-      await channel.send({
-        type: 'broadcast',
-        event: 'MATCH_STOPPED',
-        payload: { message }
-      });
-    } catch (e) {
-      console.warn('Failed to broadcast stop match:', e);
-    }
-  }
-}
-
-/**
- * Broadcast match reset event
- */
-export async function broadcastResetMatch() {
-  if (channel) {
-    try {
-      await channel.send({
-        type: 'broadcast',
-        event: 'MATCH_RESET'
-      });
-    } catch (e) {
-      console.warn('Failed to broadcast reset match:', e);
-    }
-  }
-}
-
-/**
- * Broadcast toast notification to all players
- */
-export async function broadcastToast(message: string) {
-  if (channel) {
-    try {
-      await channel.send({
-        type: 'broadcast',
-        event: 'TOAST',
-        payload: { message }
-      });
-    } catch (e) {
-      console.warn('Failed to broadcast toast:', e);
-    }
-  }
-}
-
-/**
- * Broadcast kicked player notification
- */
-export async function broadcastKickPlayer(playerId: string) {
-  if (channel) {
-    try {
-      await channel.send({
-        type: 'broadcast',
-        event: 'PLAYER_KICKED',
-        payload: { player_id: playerId }
-      });
-    } catch (e) {
-      console.warn('Failed to broadcast kick player:', e);
-    }
-  }
 }
