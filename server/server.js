@@ -242,7 +242,27 @@ function getPublicMatchState() {
       grid_size: gameState.puzzles[gameState.current_round].grid_size,
       piece_count: gameState.puzzles[gameState.current_round].piece_count,
       shuffled_order: gameState.puzzles[gameState.current_round].shuffled_order
-    } : null
+    } : null,
+    puzzles: {
+      1: {
+        id: gameState.puzzles[1].id,
+        title: gameState.puzzles[1].title,
+        description: gameState.puzzles[1].description,
+        image_url: gameState.puzzles[1].image_url,
+        difficulty: gameState.puzzles[1].difficulty,
+        grid_size: gameState.puzzles[1].grid_size,
+        piece_count: gameState.puzzles[1].piece_count
+      },
+      2: {
+        id: gameState.puzzles[2].id,
+        title: gameState.puzzles[2].title,
+        description: gameState.puzzles[2].description,
+        image_url: gameState.puzzles[2].image_url,
+        difficulty: gameState.puzzles[2].difficulty,
+        grid_size: gameState.puzzles[2].grid_size,
+        piece_count: gameState.puzzles[2].piece_count
+      }
+    }
   };
 }
 
@@ -371,6 +391,25 @@ app.get('/api/match/state', (req, res) => {
   res.json({ success: true, state: getPublicMatchState() });
 });
 
+// Get Public Lobby Players
+app.get('/api/lobby/players', (req, res) => {
+  const allPlayers = db.getAllPlayers();
+  const activeCount = allPlayers.filter(p => p.player_status !== 'KICKED' && p.player_status !== 'SPECTATOR').length;
+  res.json({
+    success: true,
+    count: activeCount,
+    total_registered: allPlayers.length,
+    max_players: gameState.max_players,
+    players: allPlayers
+  });
+});
+
+// Get Leaderboard Alias
+app.get('/api/leaderboard', (req, res) => {
+  const all = db.getAllPlayers();
+  res.json({ success: true, leaderboard: all });
+});
+
 // Check Username Availability
 app.get('/api/player/check-username', (req, res) => {
   const rawName = (req.query.name || '').toString();
@@ -444,9 +483,12 @@ app.post('/api/player/join', (req, res) => {
     });
   }
 
-  // 2. Allow existing registered player to re-enter using same username
+  // 2. Prevent duplicate username registration from another session
   const existingByName = db.getPlayerByUsername(cleanName);
   if (existingByName) {
+    if (!session_token || session_token !== existingByName.session_token) {
+      return res.status(409).json({ success: false, error: 'Username is already here. Try a new name.' });
+    }
     const updated = db.updatePlayerAvatar(existingByName.session_token, {
       animal_id,
       hat_id: hat_id || 'none',
@@ -527,7 +569,7 @@ app.post('/api/player/join', (req, res) => {
     });
   } catch (err) {
     if (err.code === 'USERNAME_TAKEN' || (err.message && err.message.includes('UNIQUE constraint'))) {
-      return res.status(400).json({ success: false, error: 'Username is already here. Try a new name.' });
+      return res.status(409).json({ success: false, error: 'Username is already here. Try a new name.' });
     }
     console.error('Join error:', err);
     res.status(500).json({ success: false, error: 'Failed to join challenge.' });
@@ -756,6 +798,28 @@ app.post('/api/admin/login', (req, res) => {
   res.status(401).json({ success: false, error: 'Invalid admin code.' });
 });
 
+// Update Match Settings (Max Players, Match Duration)
+app.post('/api/admin/settings', requireAdmin, (req, res) => {
+  const { max_players, match_duration, round_1_duration, round_2_duration } = req.body;
+  if (typeof max_players === 'number' && max_players > 0) {
+    gameState.max_players = max_players;
+  }
+  if (typeof match_duration === 'number' && match_duration > 0) {
+    gameState.match_duration_seconds = match_duration;
+  }
+  if (typeof round_1_duration === 'number' && round_1_duration > 0) {
+    gameState.round_1_duration_seconds = round_1_duration;
+  }
+  if (typeof round_2_duration === 'number' && round_2_duration > 0) {
+    gameState.round_2_duration_seconds = round_2_duration;
+  }
+  gameState.version++;
+  db.saveMatchState(gameState);
+  broadcastGameState();
+  broadcastPlayersList();
+  res.json({ success: true, match_state: getPublicMatchState() });
+});
+
 // Verify Emergency Admission Code (0000)
 app.post('/api/admin/verify-emergency-code', requireAdmin, (req, res) => {
   const { code } = req.body;
@@ -875,6 +939,8 @@ app.post('/api/admin/pause', requireAdmin, (req, res) => {
   if (gameState.is_paused || gameState.status === 'STOPPED' || gameState.status === 'WAITING' || gameState.status === 'COMPLETED') {
     return res.status(400).json({ success: false, error: 'Cannot pause match in current state.' });
   }
+  gameState.previous_status = gameState.status;
+  gameState.status = 'PAUSED';
   gameState.is_paused = true;
   gameState.paused_at = Date.now();
   gameState.version++;
@@ -889,10 +955,11 @@ app.post('/api/admin/pause', requireAdmin, (req, res) => {
 
 // 4. RESUME MATCH
 app.post('/api/admin/resume', requireAdmin, (req, res) => {
-  if (!gameState.is_paused) {
+  if (!gameState.is_paused && gameState.status !== 'PAUSED') {
     return res.status(400).json({ success: false, error: 'Match is not paused.' });
   }
   const pausedDuration = Date.now() - (gameState.paused_at || Date.now());
+  gameState.status = gameState.previous_status || 'ROUND_1';
   gameState.is_paused = false;
   gameState.paused_at = null;
   gameState.total_paused_ms += pausedDuration;
@@ -934,7 +1001,13 @@ app.post('/api/admin/reset-match', requireAdmin, (req, res) => {
   gameState.stop_reason = null;
   gameState.version++;
 
-  db.resetAllPlayers();
+  if (req.body && req.body.clear_players) {
+    db.clearAllData();
+    players.clear();
+    usernamesMap.clear();
+  } else {
+    db.resetAllPlayers();
+  }
   db.saveMatchState(gameState);
   db.recordAuditLog({ matchId: gameState.match_id, action: 'MATCH_RESET', details: 'Reset match back to WAITING lobby.' });
 
@@ -1173,6 +1246,17 @@ Respond ONLY with valid JSON.`;
     console.error('Gemini puzzle generation error:', err);
     res.status(500).json({ success: false, error: 'Gemini AI generation failed.' });
   }
+});
+
+// 404 handler for unknown API routes (guarantees JSON instead of Express HTML)
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, error: `API route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// Global error handler for API routes
+app.use('/api', (err, req, res, next) => {
+  console.error('Unhandled API error:', err);
+  res.status(500).json({ success: false, error: err.message || 'Internal server error' });
 });
 
 // ==========================================================

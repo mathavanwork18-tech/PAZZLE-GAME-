@@ -25,7 +25,16 @@ type AppView =
   | 'admin';
 
 export const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<AppView>('welcome');
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    if (typeof window !== 'undefined') {
+      const p = window.location.pathname.toLowerCase();
+      const h = window.location.hash.toLowerCase();
+      if (p.includes('admin') || h.includes('admin')) {
+        return 'admin';
+      }
+    }
+    return 'welcome';
+  });
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [matchState, setMatchState] = useState<MatchState | null>(null);
   const [playersList, setPlayersList] = useState<Player[]>([]);
@@ -79,22 +88,27 @@ export const App: React.FC = () => {
             setChosenOutfit(restored.player.outfit_id);
 
             // Authoritative route based on match state and player status
-            if (restored.player.player_status === 'KICKED') {
-              // Stay in kicked state
-            } else if (restored.player.player_status === 'SPECTATOR') {
-              // Stay in spectator state
-            } else if (restored.match_state.status === 'ROUND_1' || restored.match_state.status === 'ROUND_2') {
-              if (restored.player.completed_round_2) {
+            const isAdminRoute = typeof window !== 'undefined' && 
+              (window.location.pathname.toLowerCase().includes('admin') || window.location.hash.toLowerCase().includes('admin'));
+
+            if (!isAdminRoute) {
+              if (restored.player.player_status === 'KICKED') {
+                // Stay in kicked state
+              } else if (restored.player.player_status === 'SPECTATOR') {
+                // Stay in spectator state
+              } else if (restored.match_state.status === 'ROUND_1' || restored.match_state.status === 'ROUND_2') {
+                if (restored.player.completed_round_2) {
+                  setCurrentView('results');
+                } else {
+                  setCurrentView('game');
+                }
+              } else if (restored.match_state.status === 'COMPLETED') {
                 setCurrentView('results');
-              } else {
+              } else if (restored.match_state.status === 'STOPPED') {
                 setCurrentView('game');
+              } else {
+                setCurrentView('lobby');
               }
-            } else if (restored.match_state.status === 'COMPLETED') {
-              setCurrentView('results');
-            } else if (restored.match_state.status === 'STOPPED') {
-              setCurrentView('game');
-            } else {
-              setCurrentView('lobby');
             }
           } catch (e) {
             localStorage.removeItem('eng_player_token');

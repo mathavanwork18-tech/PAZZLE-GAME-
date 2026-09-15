@@ -6,6 +6,63 @@ const API_BASE = rawApiUrl
   ? (rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`)
   : '/api';
 
+/**
+ * Robust JSON fetcher that guards against HTML <!DOCTYPE fallback responses
+ * and automatically retries against direct backend port in development.
+ */
+async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(url, options);
+  } catch (netErr: any) {
+    // If relative /api failed in local dev on port 5173, fallback directly to port 3001
+    if (typeof window !== 'undefined' && window.location.port === '5173' && url.startsWith('/api')) {
+      try {
+        res = await fetch(`http://localhost:3001${url}`, options);
+      } catch (e) {
+        throw new Error('Cannot connect to backend server. Please verify server is running on port 3001.');
+      }
+    } else {
+      throw new Error(netErr.message || 'Network connection failed.');
+    }
+  }
+
+  const text = await res.text();
+
+  // If server/proxy returned an HTML document (<!DOCTYPE html>...), handle gracefully
+  if (text.trim().startsWith('<') || text.includes('<!DOCTYPE')) {
+    if (typeof window !== 'undefined' && window.location.port === '5173' && url.startsWith('/api')) {
+      try {
+        const directRes = await fetch(`http://localhost:3001${url}`, options);
+        const directText = await directRes.text();
+        if (!directText.trim().startsWith('<')) {
+          const directData = JSON.parse(directText);
+          if (!directRes.ok || directData.success === false) {
+            throw new Error(directData.error || `Server error (${directRes.status})`);
+          }
+          return directData as T;
+        }
+      } catch (e: any) {
+        if (e.message && !e.message.includes('Unexpected token')) throw e;
+      }
+    }
+    throw new Error(
+      res.ok
+        ? 'Server returned HTML instead of JSON. Backend service may be starting up.'
+        : `Server error (${res.status}): Please check backend service.`
+    );
+  }
+
+  let data: any;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON response: ${text.slice(0, 100)}`);
+  }
+
+  return data as T;
+}
+
 export const DEFAULT_AVATARS: Avatar[] = [
   { id: 'fox', name: 'Fox', image_url: '/avatars/fox.png', accent_color: '#F97316' },
   { id: 'panda', name: 'Panda', image_url: '/avatars/panda.png', accent_color: '#10B981' },
@@ -27,28 +84,22 @@ export const DEFAULT_AVATARS: Avatar[] = [
 
 export async function fetchAvatars(): Promise<Avatar[]> {
   try {
-    const res = await fetch(`${API_BASE}/avatars`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.avatars && data.avatars.length > 0) {
-        return data.avatars;
-      }
+    const data = await safeFetchJson(`${API_BASE}/avatars`);
+    if (data.avatars && data.avatars.length > 0) {
+      return data.avatars;
     }
   } catch (err) {
-    // fallback
+    // fallback to defaults
   }
   return DEFAULT_AVATARS;
 }
 
 export async function fetchMatchState(): Promise<MatchState> {
   try {
-    const res = await fetch(`${API_BASE}/match/state`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.state) {
-        saveCachedMatchState(data.state);
-        return data.state;
-      }
+    const data = await safeFetchJson(`${API_BASE}/match/state`);
+    if (data.state) {
+      saveCachedMatchState(data.state);
+      return data.state;
     }
   } catch (err) {
     // fallback
@@ -72,11 +123,8 @@ export async function checkUsernameAvailability(name: string): Promise<{
   }
 
   try {
-    const res = await fetch(`${API_BASE}/player/check-username?name=${encodeURIComponent(clean)}`);
-    if (res.ok) {
-      const data = await res.json();
-      return data;
-    }
+    const data = await safeFetchJson(`${API_BASE}/player/check-username?name=${encodeURIComponent(clean)}`);
+    return data;
   } catch (apiErr) {
     // fallback
   }
@@ -103,7 +151,7 @@ export async function joinPlayer(
   const safeGlasses = (glassesId as GlassesId) || 'none';
   const safeOutfit = (outfitId as OutfitId) || 'none';
 
-  const res = await fetch(`${API_BASE}/player/join`, {
+  const data = await safeFetchJson(`${API_BASE}/player/join`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -116,8 +164,7 @@ export async function joinPlayer(
     })
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success || !data.player) {
+  if (!data.success || !data.player) {
     throw new Error(data.error || 'Failed to join challenge.');
   }
 
@@ -130,13 +177,9 @@ export async function restoreSession(token: string): Promise<{
   player: Player;
   match_state: MatchState;
 }> {
-  const res = await fetch(`${API_BASE}/player/session/${token}`);
-  if (!res.ok) {
-    throw new Error('Session not found or expired.');
-  }
-  const data = await res.json();
+  const data = await safeFetchJson(`${API_BASE}/player/session/${token}`);
   if (!data.success || !data.player) {
-    throw new Error('Invalid session response.');
+    throw new Error(data.error || 'Session not found or expired.');
   }
 
   trackPlayerPresence(data.player);
@@ -146,7 +189,7 @@ export async function restoreSession(token: string): Promise<{
 
 export async function sendHeartbeat(sessionToken: string): Promise<void> {
   try {
-    await fetch(`${API_BASE}/player/heartbeat`, {
+    await safeFetchJson(`${API_BASE}/player/heartbeat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ session_token: sessionToken })
@@ -157,14 +200,13 @@ export async function sendHeartbeat(sessionToken: string): Promise<void> {
 }
 
 export async function advanceRound2(sessionToken: string): Promise<{ player: Player }> {
-  const res = await fetch(`${API_BASE}/player/advance-round-2`, {
+  const data = await safeFetchJson(`${API_BASE}/player/advance-round-2`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_token: sessionToken })
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success || !data.player) {
+  if (!data.success || !data.player) {
     throw new Error(data.error || 'Failed to advance to Round 2.');
   }
 
@@ -193,14 +235,13 @@ export async function submitPuzzle(payload: {
   error?: string;
   message?: string;
 }> {
-  const res = await fetch(`${API_BASE}/puzzle/submit`, {
+  const data = await safeFetchJson(`${API_BASE}/puzzle/submit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
 
-  const data = await res.json();
-  if (!res.ok && !data.correct) {
+  if (!data.success && !data.correct) {
     throw new Error(data.error || 'Submission rejected by server.');
   }
 
@@ -225,164 +266,160 @@ export async function submitPuzzle(payload: {
 }
 
 export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
-  const res = await fetch(`${API_BASE}/match/leaderboard`);
-  if (res.ok) {
-    const data = await res.json();
+  try {
+    const data = await safeFetchJson(`${API_BASE}/match/leaderboard`);
     if (data.leaderboard && Array.isArray(data.leaderboard)) {
       return data.leaderboard.map((p: any, idx: number) => ({
         ...p,
         rank: idx + 1
       }));
     }
+  } catch (e) {
+    // ignore
   }
   return [];
 }
 
 // Admin APIs
 export async function adminLogin(code: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/admin/login`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code })
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success || !data.admin_token) {
+  if (!data.success || !data.admin_token) {
     throw new Error(data.error || 'Invalid admin credentials.');
   }
   return data.admin_token;
 }
 
 export async function verifyEmergencyCode(token: string, code: string): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/admin/verify-emergency-code`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/verify-emergency-code`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
     body: JSON.stringify({ code })
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+
+  if (!data.success) {
     throw new Error(data.error || 'Invalid emergency code.');
   }
   return true;
 }
 
 export async function adminStartMatch(token: string): Promise<MatchState> {
-  const res = await fetch(`${API_BASE}/admin/start-match`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/start-match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token }
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+  if (!data.success) {
     throw new Error(data.error || 'Failed to start match.');
   }
   return data.match_state;
 }
 
 export async function adminStopMatch(token: string): Promise<MatchState> {
-  const res = await fetch(`${API_BASE}/admin/stop-match`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/stop-match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token }
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+  if (!data.success) {
     throw new Error(data.error || 'Failed to stop match.');
   }
   return data.match_state;
 }
 
 export async function adminPause(token: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/admin/pause`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/pause`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token }
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+
+  if (!data.success) {
     throw new Error(data.error || 'Failed to pause match.');
   }
 }
 
 export async function adminResume(token: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/admin/resume`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/resume`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token }
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+
+  if (!data.success) {
     throw new Error(data.error || 'Failed to resume match.');
   }
 }
 
 export async function adminResetMatch(token: string): Promise<MatchState> {
-  const res = await fetch(`${API_BASE}/admin/reset-match`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/reset-match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token }
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+
+  if (!data.success) {
     throw new Error(data.error || 'Failed to reset match.');
   }
   return data.match_state;
 }
 
 export async function adminEndMatch(token: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/admin/end-match`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/end-match`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token }
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+
+  if (!data.success) {
     throw new Error(data.error || 'Failed to end match.');
   }
 }
 
 export async function adminAdmitPlayer(token: string, playerId: string): Promise<Player> {
-  const res = await fetch(`${API_BASE}/admin/admit-player`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/admit-player`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
     body: JSON.stringify({ player_id: playerId })
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success || !data.player) {
+  if (!data.success || !data.player) {
     throw new Error(data.error || 'Failed to admit player.');
   }
   return data.player;
 }
 
 export async function adminKickPlayer(token: string, playerId: string, reason?: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/admin/kick-player`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/kick-player`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
     body: JSON.stringify({ player_id: playerId, reason })
   });
 
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+  if (!data.success) {
     throw new Error(data.error || 'Failed to kick player.');
   }
 }
 
 export async function adminRemovePlayer(token: string, playerId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/admin/remove-player`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/remove-player`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token },
     body: JSON.stringify({ player_id: playerId })
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+
+  if (!data.success) {
     throw new Error(data.error || 'Failed to remove player.');
   }
 }
 
 export async function adminClearAllPlayers(token: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/admin/clear-all-players`, {
+  const data = await safeFetchJson(`${API_BASE}/admin/clear-all-players`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-admin-token': token }
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
+
+  if (!data.success) {
     throw new Error(data.error || 'Failed to clear players.');
   }
   localStorage.removeItem('eng_player_token');
@@ -390,72 +427,72 @@ export async function adminClearAllPlayers(token: string): Promise<void> {
 }
 
 export async function fetchAdminPlayers(token: string): Promise<Player[]> {
-  const res = await fetch(`${API_BASE}/admin/players`, {
-    headers: { 'x-admin-token': token }
-  });
-  if (res.ok) {
-    const data = await res.json();
+  try {
+    const data = await safeFetchJson(`${API_BASE}/admin/players`, {
+      headers: { 'x-admin-token': token }
+    });
     return data.players || [];
+  } catch (e) {
+    return [];
   }
-  return [];
 }
 
 export async function fetchLateJoiners(token: string): Promise<Player[]> {
-  const res = await fetch(`${API_BASE}/admin/late-joiners`, {
-    headers: { 'x-admin-token': token }
-  });
-  if (res.ok) {
-    const data = await res.json();
+  try {
+    const data = await safeFetchJson(`${API_BASE}/admin/late-joiners`, {
+      headers: { 'x-admin-token': token }
+    });
     return data.late_joiners || [];
+  } catch (e) {
+    return [];
   }
-  return [];
 }
 
 export async function fetchKickedPlayers(token: string): Promise<Player[]> {
-  const res = await fetch(`${API_BASE}/admin/kicked-players`, {
-    headers: { 'x-admin-token': token }
-  });
-  if (res.ok) {
-    const data = await res.json();
+  try {
+    const data = await safeFetchJson(`${API_BASE}/admin/kicked-players`, {
+      headers: { 'x-admin-token': token }
+    });
     return data.kicked_players || [];
+  } catch (e) {
+    return [];
   }
-  return [];
 }
 
 export async function fetchCoinTransactions(token: string, playerId?: string): Promise<CoinTransaction[]> {
-  const url = playerId ? `${API_BASE}/admin/coin-transactions?player_id=${encodeURIComponent(playerId)}` : `${API_BASE}/admin/coin-transactions`;
-  const res = await fetch(url, {
-    headers: { 'x-admin-token': token }
-  });
-  if (res.ok) {
-    const data = await res.json();
+  try {
+    const url = playerId ? `${API_BASE}/admin/coin-transactions?player_id=${encodeURIComponent(playerId)}` : `${API_BASE}/admin/coin-transactions`;
+    const data = await safeFetchJson(url, {
+      headers: { 'x-admin-token': token }
+    });
     return data.transactions || [];
+  } catch (e) {
+    return [];
   }
-  return [];
 }
 
 export async function fetchAuditLogs(token: string): Promise<AuditLogEntry[]> {
-  const res = await fetch(`${API_BASE}/admin/audit-logs`, {
-    headers: { 'x-admin-token': token }
-  });
-  if (res.ok) {
-    const data = await res.json();
+  try {
+    const data = await safeFetchJson(`${API_BASE}/admin/audit-logs`, {
+      headers: { 'x-admin-token': token }
+    });
     return data.logs || [];
+  } catch (e) {
+    return [];
   }
-  return [];
 }
 
 export async function updateAvatar(
   sessionToken: string,
   config: { animal_id?: string; hat_id?: HatId | string; glasses_id?: GlassesId | string; outfit_id?: OutfitId | string }
 ): Promise<{ player: Player }> {
-  const res = await fetch(`${API_BASE}/player/update-avatar`, {
+  const data = await safeFetchJson(`${API_BASE}/player/update-avatar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_token: sessionToken, ...config })
   });
-  const data = await res.json();
-  if (!res.ok || !data.success || !data.player) {
+
+  if (!data.success || !data.player) {
     throw new Error(data.error || 'Failed to update avatar.');
   }
   trackPlayerPresence(data.player);

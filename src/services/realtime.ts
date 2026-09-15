@@ -20,6 +20,8 @@ let sbChannel: RealtimeChannel | null = null;
 let currentTrackingPlayer: Player | null = null;
 let activeHandlers: RealtimeHandlers | null = null;
 let wsReconnectTimer: any = null;
+let pingInterval: any = null;
+let isCleanedUp = false;
 
 export function getDefaultMatchState(): MatchState {
   try {
@@ -68,34 +70,79 @@ export function saveCachedMatchState(state: MatchState) {
 }
 
 /**
+ * Determine the optimal WebSocket URL
+ */
+function getWebSocketUrl(): string {
+  const envWs = (import.meta.env.VITE_WS_URL || '').trim();
+  if (envWs) return envWs;
+
+  const envApi = (import.meta.env.VITE_API_URL || '').trim();
+  if (envApi) {
+    try {
+      const parsed = new URL(envApi);
+      const proto = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${proto}//${parsed.host}/ws`;
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  if (typeof window === 'undefined') return 'ws://localhost:3001/ws';
+
+  const isHttps = window.location.protocol === 'https:';
+  const wsProto = isHttps ? 'wss:' : 'ws:';
+
+  // In local Vite dev environment on port 5173, connect directly to Express server on 3001
+  // to avoid any proxy latency or proxy drops
+  if (window.location.port === '5173' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+    return `${wsProto}//${window.location.hostname}:3001/ws`;
+  }
+
+  return `${wsProto}//${window.location.host}/ws`;
+}
+
+/**
  * Connect to primary server-authoritative native WebSocket endpoint
  */
 function connectNativeWebSocket(handlers: RealtimeHandlers) {
+  if (isCleanedUp) return;
   if (nativeWs && (nativeWs.readyState === WebSocket.OPEN || nativeWs.readyState === WebSocket.CONNECTING)) {
     return;
   }
 
-  // Determine WebSocket URL: use relative /ws (handled by Vite proxy) or fallback
-  const isHttps = window.location.protocol === 'https:';
-  const wsProto = isHttps ? 'wss:' : 'ws:';
-  let wsUrl = `${wsProto}//${window.location.host}/ws`;
+  const wsUrl = getWebSocketUrl();
 
-  // If in dev and vite proxy is localhost:5173, /ws proxies to 3001
   try {
-    nativeWs = new WebSocket(wsUrl);
+    const ws = new WebSocket(wsUrl);
+    nativeWs = ws;
 
-    nativeWs.onopen = () => {
+    ws.onopen = () => {
+      if (ws !== nativeWs) return;
       console.log('📡 Connected to Server Native WebSocket at', wsUrl);
       handlers.onConnectionChange(true);
+
+      // Start 15s keepalive ping to prevent proxy/browser idle disconnects
+      clearInterval(pingInterval);
+      pingInterval = setInterval(() => {
+        if (nativeWs && nativeWs.readyState === WebSocket.OPEN) {
+          try {
+            nativeWs.send(JSON.stringify({ type: 'PING' }));
+          } catch (e) {
+            // ignore
+          }
+        }
+      }, 15000);
+
       if (currentTrackingPlayer) {
-        nativeWs?.send(JSON.stringify({
+        ws.send(JSON.stringify({
           type: 'IDENTIFY',
           session_token: currentTrackingPlayer.session_token
         }));
       }
     };
 
-    nativeWs.onmessage = (event) => {
+    ws.onmessage = (event) => {
+      if (ws !== nativeWs) return;
       try {
         const data = JSON.parse(event.data);
         if (!data || !data.type) return;
@@ -154,28 +201,51 @@ function connectNativeWebSocket(handlers: RealtimeHandlers) {
               handlers.onToast(data.payload.message);
             }
             break;
+
+          case 'PONG':
+            // Heartbeat response acknowledged
+            break;
         }
       } catch (e) {
         console.error('Error parsing WebSocket message:', e);
       }
     };
 
-    nativeWs.onerror = (err) => {
-      console.warn('Native WebSocket error:', err);
+    ws.onerror = (err) => {
+      console.warn('Native WebSocket error on', wsUrl);
     };
 
-    nativeWs.onclose = () => {
-      console.log('Native WebSocket disconnected, retrying in 3s...');
-      nativeWs = null;
-      handlers.onConnectionChange(false);
-      clearTimeout(wsReconnectTimer);
-      wsReconnectTimer = setTimeout(() => {
-        if (activeHandlers) connectNativeWebSocket(activeHandlers);
-      }, 3000);
+    ws.onclose = () => {
+      clearInterval(pingInterval);
+      if (ws === nativeWs) {
+        nativeWs = null;
+        if (!isCleanedUp) {
+          handlers.onConnectionChange(false);
+          clearTimeout(wsReconnectTimer);
+          wsReconnectTimer = setTimeout(() => {
+            if (activeHandlers && !isCleanedUp) {
+              connectNativeWebSocket(activeHandlers);
+            }
+          }, 2000);
+        }
+      }
     };
   } catch (e) {
     console.warn('Failed to establish Native WebSocket connection:', e);
   }
+}
+
+// Auto-reconnect on tab visibility restore
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !isCleanedUp) {
+      if (!nativeWs || nativeWs.readyState !== WebSocket.OPEN) {
+        if (activeHandlers) {
+          connectNativeWebSocket(activeHandlers);
+        }
+      }
+    }
+  });
 }
 
 /**
@@ -184,6 +254,7 @@ function connectNativeWebSocket(handlers: RealtimeHandlers) {
  * Secondary: Supabase Realtime channel fallback.
  */
 export function initRealtime(handlers: RealtimeHandlers) {
+  isCleanedUp = false;
   activeHandlers = handlers;
 
   // 1. Connect Primary Native WebSocket
@@ -241,11 +312,19 @@ export function initRealtime(handlers: RealtimeHandlers) {
   }
 
   return () => {
+    isCleanedUp = true;
+    clearInterval(pingInterval);
+    clearTimeout(wsReconnectTimer);
+
     if (nativeWs) {
+      nativeWs.onopen = null;
+      nativeWs.onclose = null;
+      nativeWs.onerror = null;
+      nativeWs.onmessage = null;
       nativeWs.close();
       nativeWs = null;
     }
-    clearTimeout(wsReconnectTimer);
+
     if (sbChannel) {
       supabase.removeChannel(sbChannel);
       sbChannel = null;

@@ -748,4 +748,15 @@ export function loadMatchState() {
   };
 }
 
+export function clearAllData() {
+  db.exec(`
+    DELETE FROM players;
+    DELETE FROM coin_transactions;
+    DELETE FROM audit_logs;
+  `);
+  try {
+    db.exec(`DELETE FROM sqlite_sequence WHERE name IN ('players', 'coin_transactions', 'audit_logs');`);
+  } catch (e) {}
+}
+
 export default db;
