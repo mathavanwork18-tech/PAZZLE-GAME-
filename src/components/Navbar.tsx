@@ -1,14 +1,23 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Shield, Wifi, WifiOff } from 'lucide-react';
+import { Volume2, VolumeX, Shield, Wifi, WifiOff, LogOut } from 'lucide-react';
 import { sounds } from '../services/sound';
+import { Player } from '../types/game';
 
 interface NavbarProps {
   isConnected: boolean;
   onAdminClick: () => void;
   isAdminMode?: boolean;
+  player?: Player | null;
+  onLogout?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ isConnected, onAdminClick, isAdminMode }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  isConnected,
+  onAdminClick,
+  isAdminMode,
+  player,
+  onLogout
+}) => {
   const [muted, setMuted] = useState(sounds.getMuted());
 
   const handleToggleSound = () => {
@@ -55,6 +64,31 @@ export const Navbar: React.FC<NavbarProps> = ({ isConnected, onAdminClick, isAdm
           >
             {muted ? <VolumeX className="w-4 h-4 text-slate-400" /> : <Volume2 className="w-4 h-4 text-blue-600" />}
           </button>
+
+          {/* Active Player Badge & Logout Button */}
+          {player && onLogout && !isAdminMode && (
+            <div className="flex items-center space-x-1.5 sm:space-x-2 pl-1 border-l border-slate-200">
+              <div
+                className="hidden md:flex items-center space-x-1.5 bg-blue-50 px-2 py-1 rounded-xl border border-blue-200/80 max-w-[130px]"
+                title={`Logged in as ${player.name} (${player.player_id || 'Player'})`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span className="text-xs font-bold text-slate-800 truncate">
+                  {player.name}
+                </span>
+              </div>
+
+              <button
+                onClick={onLogout}
+                aria-label="Log Out of Challenge"
+                title="Log Out"
+                className="flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all btn-press"
+              >
+                <LogOut className="w-3.5 h-3.5 text-rose-600" />
+                <span className="hidden sm:inline">Logout</span>
+              </button>
+            </div>
+          )}
 
           {/* Protected Admin Access Entry */}
           <button

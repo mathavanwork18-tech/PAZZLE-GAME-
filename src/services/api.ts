@@ -2,6 +2,7 @@ import { MatchState, Player, Avatar, LeaderboardEntry, HatId, GlassesId, OutfitI
 import { supabase } from '../utils/supabase';
 import {
   trackPlayerPresence,
+  untrackPlayerPresence,
   broadcastMatchState,
   broadcastStartMatch,
   broadcastStopMatch,
@@ -867,4 +868,23 @@ export async function fetchAdminPlayers(token: string): Promise<Player[]> {
   }
 
   return [];
+}
+
+export async function logoutPlayer(player?: Player | null): Promise<void> {
+  try {
+    if (player) {
+      await untrackPlayerPresence();
+      if (player.name) {
+        await supabase
+          .from('players')
+          .update({ connection_status: 'disconnected', last_seen_at: new Date().toISOString() })
+          .ilike('name', player.name);
+      }
+    }
+  } catch (err) {
+    console.warn('[Logout] Notice during player logout:', err);
+  } finally {
+    localStorage.removeItem('eng_player_token');
+    localStorage.removeItem('eng_player_data');
+  }
 }

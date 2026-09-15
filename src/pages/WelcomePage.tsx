@@ -1,13 +1,22 @@
 import React from 'react';
-import { ArrowRight, Puzzle, Cpu, Trophy, Compass, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Puzzle, Cpu, Trophy, Compass, ShieldCheck, LogOut } from 'lucide-react';
+import { Player } from '../types/game';
 
 interface WelcomePageProps {
   onEnter: () => void;
   playerCount: number;
   maxPlayers: number;
+  currentPlayer?: Player | null;
+  onLogout?: () => void;
 }
 
-export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter, playerCount, maxPlayers }) => {
+export const WelcomePage: React.FC<WelcomePageProps> = ({
+  onEnter,
+  playerCount,
+  maxPlayers,
+  currentPlayer,
+  onLogout
+}) => {
   return (
     <div className="flex flex-col items-center justify-between min-h-[calc(100vh-64px)] p-4 sm:p-6 max-w-md mx-auto animate-fade-in">
       {/* Top Event Header */}
@@ -72,9 +81,20 @@ export const WelcomePage: React.FC<WelcomePageProps> = ({ onEnter, playerCount, 
           onClick={onEnter}
           className="w-full py-4 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base shadow-sm hover:shadow flex items-center justify-center space-x-2.5 transition-all btn-press"
         >
-          <span>START CHALLENGE</span>
+          <span>{currentPlayer ? `CONTINUE AS ${currentPlayer.name.toUpperCase()}` : 'START CHALLENGE'}</span>
           <ArrowRight className="w-5 h-5" />
         </button>
+
+        {currentPlayer && onLogout && (
+          <button
+            onClick={onLogout}
+            className="w-full mt-2.5 py-3 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center space-x-2 border border-rose-200 transition-all btn-press shadow-xs"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-600" />
+            <span>LOG OUT ({currentPlayer.name})</span>
+          </button>
+        )}
+
         <div className="flex items-center justify-center space-x-1.5 text-slate-500 text-[11px] mt-3">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
           <span>Independent multiplayer state • Mobile optimized</span>

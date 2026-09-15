@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { LogOut } from 'lucide-react';
 import { MatchState, Player, Avatar, HatId, GlassesId, OutfitId } from './types/game';
 import { Navbar } from './components/Navbar';
 import { ToastContainer, ToastItem } from './components/ToastContainer';
@@ -10,7 +11,7 @@ import { LobbyPage } from './pages/LobbyPage';
 import { GamePage } from './pages/GamePage';
 import { ResultPage } from './pages/ResultPage';
 import { AdminPage } from './pages/AdminPage';
-import { fetchAvatars, fetchMatchState, joinPlayer, restoreSession, sendHeartbeat, savePlayerNameToSupabase } from './services/api';
+import { fetchAvatars, fetchMatchState, joinPlayer, restoreSession, sendHeartbeat, savePlayerNameToSupabase, logoutPlayer } from './services/api';
 import { initRealtime, trackPlayerPresence } from './services/realtime';
 
 type AppView = 
@@ -43,6 +44,7 @@ export const App: React.FC = () => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [isJoining, setIsJoining] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState<boolean>(false);
 
   // Toast Notification Helper
   const showToast = (message: string) => {
@@ -247,6 +249,28 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    setShowLogoutConfirm(false);
+    try {
+      await logoutPlayer(player);
+    } catch (e) {
+      localStorage.removeItem('eng_player_token');
+      localStorage.removeItem('eng_player_data');
+    }
+    setPlayer(null);
+    setChosenUsername('');
+    setChosenAvatarId('panda');
+    setChosenHat('none');
+    setChosenGlasses('none');
+    setChosenOutfit('none');
+    setCurrentView('welcome');
+    showToast('Logged out successfully.');
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans select-none antialiased">
       {/* Top Navigation */}
@@ -254,6 +278,8 @@ export const App: React.FC = () => {
         isConnected={isConnected}
         onAdminClick={() => setCurrentView((prev) => (prev === 'admin' ? (player ? 'lobby' : 'welcome') : 'admin'))}
         isAdminMode={currentView === 'admin'}
+        player={player}
+        onLogout={handleLogoutClick}
       />
 
       {/* Main View Router */}
@@ -264,6 +290,8 @@ export const App: React.FC = () => {
             onEnter={() => (player ? setCurrentView('lobby') : setCurrentView('setup-username'))}
             playerCount={playersList.length}
             maxPlayers={matchState?.max_players || 40}
+            currentPlayer={player}
+            onLogout={handleLogoutClick}
           />
         )}
 
@@ -313,6 +341,7 @@ export const App: React.FC = () => {
             avatars={avatars}
             maxPlayers={matchState?.max_players || 40}
             countdown={countdown}
+            onLogout={handleLogoutClick}
           />
         )}
 
@@ -333,6 +362,7 @@ export const App: React.FC = () => {
             currentPlayer={player}
             avatars={avatars}
             onBackToHome={() => setCurrentView(matchState?.status === 'WAITING' ? 'lobby' : 'welcome')}
+            onLogout={handleLogoutClick}
           />
         )}
 
@@ -347,6 +377,41 @@ export const App: React.FC = () => {
           />
         )}
       </main>
+
+      {/* Logout Confirmation Modal */}
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full border border-slate-200 shadow-xl text-center">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto mb-3.5 border border-rose-100">
+              <LogOut className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">
+              Log Out of Challenge?
+            </h3>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+              {currentView === 'game'
+                ? 'You are currently in an active game! Logging out will exit your current puzzle session.'
+                : 'You will be logged out of this session and returned to the welcome screen.'}
+            </p>
+            <div className="mt-5 flex space-x-2.5">
+              <button
+                type="button"
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all btn-press"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmLogout}
+                className="flex-1 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-all btn-press shadow-sm"
+              >
+                Confirm Log Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Real-Time Toast Notifications */}
       <ToastContainer toasts={toasts} />

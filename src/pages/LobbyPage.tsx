@@ -1,6 +1,6 @@
 import React from 'react';
 import { Player, Avatar } from '../types/game';
-import { Users, Clock, Wifi, CheckCircle2 } from 'lucide-react';
+import { Users, Clock, Wifi, CheckCircle2, LogOut } from 'lucide-react';
 import { AvatarRenderer } from '../components/AvatarRenderer';
 
 interface LobbyPageProps {
@@ -9,13 +9,15 @@ interface LobbyPageProps {
   avatars: Avatar[];
   maxPlayers: number;
   countdown: number | null; // 3, 2, 1, 0, or null
+  onLogout?: () => void;
 }
 
 export const LobbyPage: React.FC<LobbyPageProps> = ({
   currentPlayer,
   playersList,
   maxPlayers,
-  countdown
+  countdown,
+  onLogout
 }) => {
   // Ensure currentPlayer is always included in the effective display list
   const hasCurrent = playersList.some(
@@ -80,6 +82,17 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
             Mascot: <strong className="text-slate-700">{currentPlayer.animal_id}</strong>
           </p>
         </div>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            title="Log Out and change player"
+            className="flex items-center space-x-1.5 px-3.5 py-2.5 rounded-2xl text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all btn-press shrink-0 shadow-xs"
+          >
+            <LogOut className="w-4 h-4 text-rose-600" />
+            <span className="hidden sm:inline">Log Out</span>
+          </button>
+        )}
       </div>
 
       {/* Live Participant Count Header */}

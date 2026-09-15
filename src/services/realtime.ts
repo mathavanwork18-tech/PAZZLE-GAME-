@@ -226,6 +226,20 @@ export async function trackPlayerPresence(player: Player) {
 }
 
 /**
+ * Remove active player from room presence
+ */
+export async function untrackPlayerPresence() {
+  currentTrackingPlayer = null;
+  if (channel) {
+    try {
+      await channel.untrack();
+    } catch (e) {
+      console.warn('Failed to untrack player presence:', e);
+    }
+  }
+}
+
+/**
  * Broadcast match state to all connected players
  */
 export async function broadcastMatchState(state: MatchState) {

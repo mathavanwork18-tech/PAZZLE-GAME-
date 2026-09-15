@@ -4,7 +4,7 @@ import {
   Shield, Play, Pause, Square, RotateCcw,
   Users, Download, Trash2, Key, Search,
   Clock, AlertTriangle, Coins, Ban, Eye,
-  ChevronLeft, ChevronRight, X, Check, Activity
+  ChevronLeft, ChevronRight, X, Check, Activity, LogOut
 } from 'lucide-react';
 import {
   adminLogin, adminStartMatch, adminStopMatch, adminPause,
@@ -333,9 +333,10 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           </button>
           <button
             onClick={handleLogout}
-            className="px-3.5 py-2 rounded-xl bg-white hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-xs font-bold border border-slate-300 transition-all btn-press"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 text-xs font-bold border border-slate-300 transition-all btn-press flex items-center space-x-1.5"
           >
-            Log Out
+            <LogOut className="w-3.5 h-3.5 text-rose-500" />
+            <span>Log Out</span>
           </button>
         </div>
       </div>

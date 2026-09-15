@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Player, LeaderboardEntry, Avatar } from '../types/game';
-import { Trophy, Coins, Award, Clock, ArrowLeft, CheckCircle2, XCircle } from 'lucide-react';
+import { Trophy, Coins, Award, Clock, ArrowLeft, CheckCircle2, XCircle, LogOut } from 'lucide-react';
 import { AvatarRenderer } from '../components/AvatarRenderer';
 import { fetchLeaderboard } from '../services/api';
 
@@ -8,11 +8,13 @@ interface ResultPageProps {
   currentPlayer: Player;
   avatars: Avatar[];
   onBackToHome: () => void;
+  onLogout?: () => void;
 }
 
 export const ResultPage: React.FC<ResultPageProps> = ({
   currentPlayer,
-  onBackToHome
+  onBackToHome,
+  onLogout
 }) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -234,14 +236,24 @@ export const ResultPage: React.FC<ResultPageProps> = ({
       </div>
 
       {/* Back to Home CTA */}
-      <div className="flex justify-center">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <button
           onClick={onBackToHome}
-          className="px-6 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center space-x-2 border border-slate-300 transition-all btn-press"
+          className="px-6 py-3.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center space-x-2 border border-slate-300 transition-all btn-press shadow-xs"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>BACK TO EVENT LOBBY</span>
         </button>
+
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            className="px-6 py-3.5 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center space-x-2 border border-rose-200 transition-all btn-press shadow-xs"
+          >
+            <LogOut className="w-4 h-4 text-rose-600" />
+            <span>LOG OUT</span>
+          </button>
+        )}
       </div>
     </div>
   );
