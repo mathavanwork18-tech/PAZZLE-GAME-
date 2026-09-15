@@ -10,7 +10,7 @@ import { LobbyPage } from './pages/LobbyPage';
 import { GamePage } from './pages/GamePage';
 import { ResultPage } from './pages/ResultPage';
 import { AdminPage } from './pages/AdminPage';
-import { fetchAvatars, fetchMatchState, joinPlayer, restoreSession, sendHeartbeat } from './services/api';
+import { fetchAvatars, fetchMatchState, joinPlayer, restoreSession, sendHeartbeat, savePlayerNameToSupabase } from './services/api';
 import { initRealtime, trackPlayerPresence } from './services/realtime';
 
 type AppView = 
@@ -187,6 +187,7 @@ export const App: React.FC = () => {
   // Step 1 -> Step 2
   const handleUsernameConfirmed = (name: string) => {
     setChosenUsername(name);
+    savePlayerNameToSupabase(name);
     setCurrentView('setup-avatar');
   };
 

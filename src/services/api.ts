@@ -162,6 +162,73 @@ export async function checkUsernameAvailability(name: string): Promise<{
   return { available: true, message: 'Username available' };
 }
 
+export async function savePlayerNameToSupabase(name: string): Promise<void> {
+  const clean = (name || '').trim();
+  if (!clean) return;
+
+  try {
+    const { error } = await supabase
+      .from('players')
+      .upsert({
+        name: clean,
+        player_code: `ENG-${Math.floor(1000 + Math.random() * 9000)}`,
+        animal_id: 'fox',
+        hat_id: 'none',
+        status: 'WAITING',
+        connection_status: 'connected',
+        session_token: `tok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        session_token_hash: '',
+        last_seen_at: new Date().toISOString()
+      }, { onConflict: 'name' });
+
+    if (!error) {
+      console.log(`[Supabase] Player name "${clean}" saved directly to database.`);
+    } else {
+      console.warn('[Supabase] Direct name storage notice:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Supabase] Direct name storage exception:', err);
+  }
+}
+
+export async function savePlayerToSupabase(player: Player): Promise<void> {
+  try {
+    const row: any = {
+      name: player.name,
+      player_code: player.player_id,
+      animal_id: player.animal_id || 'fox',
+      hat_id: player.hat_id || 'none',
+      glasses_id: player.glasses_id || 'none',
+      outfit_id: player.outfit_id || 'none',
+      total_score: player.total_score || 0,
+      coins: player.coins || 0,
+      round_1_score: player.round_1_score || 0,
+      round_2_score: player.round_2_score || 0,
+      round_1_moves: player.round_1_moves || 0,
+      round_2_moves: player.round_2_moves || 0,
+      completed_round_1: Boolean(player.completed_round_1),
+      completed_round_2: Boolean(player.completed_round_2),
+      status: player.status || 'WAITING',
+      connection_status: player.connection_status || 'connected',
+      session_token: player.session_token,
+      session_token_hash: player.session_token || '',
+      last_seen_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('players')
+      .upsert(row, { onConflict: 'name' });
+
+    if (!error) {
+      console.log(`[Supabase] Player "${player.name}" fully saved to database.`);
+    } else {
+      console.warn('[Supabase] Player record save notice:', error.message);
+    }
+  } catch (err) {
+    console.warn('[Supabase] Player record save exception:', err);
+  }
+}
+
 export async function joinPlayer(
   name: string,
   animalId: string,
@@ -201,8 +268,9 @@ export async function joinPlayer(
     if (contentType.includes('application/json')) {
       const data = await res.json();
       if (res.ok && data.success && data.player) {
-        // Track in Supabase Realtime as well
+        // Track in Supabase Realtime & DB
         trackPlayerPresence(data.player);
+        savePlayerToSupabase(data.player);
         localStorage.setItem('eng_player_data', JSON.stringify(data.player));
         return data;
       }
@@ -216,7 +284,7 @@ export async function joinPlayer(
     }
   }
 
-  // Tier 2: Resilient Cloud Session (Multiplayer via Supabase Realtime)
+  // Tier 2: Resilient Cloud Session (Direct Supabase Database Storage + Realtime Sync)
   const token = sessionToken || `tok_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const pId = `ENG-${Math.floor(1000 + Math.random() * 9000)}`;
   const fallbackPlayer: Player = {
@@ -244,6 +312,7 @@ export async function joinPlayer(
 
   localStorage.setItem('eng_player_data', JSON.stringify(fallbackPlayer));
   trackPlayerPresence(fallbackPlayer);
+  await savePlayerToSupabase(fallbackPlayer);
 
   const state = await fetchMatchState();
   return {
@@ -263,12 +332,53 @@ export async function restoreSession(token: string): Promise<{
       const data = await res.json();
       if (data.success && data.player) {
         trackPlayerPresence(data.player);
+        savePlayerToSupabase(data.player);
         localStorage.setItem('eng_player_data', JSON.stringify(data.player));
         return data;
       }
     }
   } catch (e) {
     // fallback
+  }
+
+  // Direct Supabase lookup
+  try {
+    const { data: sbPlayer, error } = await supabase
+      .from('players')
+      .select('*')
+      .or(`session_token.eq.${token},session_token_hash.eq.${token}`)
+      .maybeSingle();
+
+    if (!error && sbPlayer) {
+      const restoredPlayer: Player = {
+        id: sbPlayer.player_code || sbPlayer.id,
+        player_id: sbPlayer.player_code || sbPlayer.id,
+        name: sbPlayer.name,
+        animal_id: sbPlayer.animal_id || 'fox',
+        hat_id: sbPlayer.hat_id || 'none',
+        glasses_id: 'none',
+        outfit_id: 'none',
+        total_score: sbPlayer.total_score || 0,
+        coins: sbPlayer.coins || 0,
+        round_1_score: sbPlayer.round_1_score || 0,
+        round_2_score: sbPlayer.round_2_score || 0,
+        completed_round_1: Boolean(sbPlayer.completed_round_1),
+        completed_round_2: Boolean(sbPlayer.completed_round_2),
+        status: sbPlayer.status || 'WAITING',
+        connection_status: 'connected',
+        session_token: token,
+        joined_at: new Date(sbPlayer.joined_at).getTime() || Date.now(),
+        last_seen_at: Date.now()
+      };
+      localStorage.setItem('eng_player_data', JSON.stringify(restoredPlayer));
+      trackPlayerPresence(restoredPlayer);
+      return {
+        player: restoredPlayer,
+        match_state: await fetchMatchState()
+      };
+    }
+  } catch (sbErr) {
+    // fallback to local storage
   }
 
   const cachedStr = localStorage.getItem('eng_player_data');
@@ -415,6 +525,7 @@ export async function submitPuzzle(payload: {
       finalPlayer = p;
       localStorage.setItem('eng_player_data', JSON.stringify(p));
       trackPlayerPresence(p);
+      savePlayerToSupabase(p);
     } catch (err) {
       // ignore
     }
@@ -440,6 +551,37 @@ export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
       if (data.leaderboard && data.leaderboard.length > 0) {
         return data.leaderboard;
       }
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  // Direct Supabase query for real-time live leaderboard
+  try {
+    const { data: sbPlayers, error } = await supabase
+      .from('players')
+      .select('*')
+      .order('total_score', { ascending: false })
+      .limit(40);
+
+    if (!error && sbPlayers && sbPlayers.length > 0) {
+      return sbPlayers.map((sp: any, idx: number) => ({
+        id: sp.player_code || sp.id,
+        name: sp.name,
+        animal_id: sp.animal_id || 'fox',
+        hat_id: sp.hat_id || 'none',
+        glasses_id: 'none',
+        outfit_id: 'none',
+        round_1_score: Number(sp.round_1_score) || 0,
+        round_2_score: Number(sp.round_2_score) || 0,
+        total_score: Number(sp.total_score) || 0,
+        coins: Number(sp.coins) || 0,
+        total_time_ms: Number(sp.round_1_time_ms || 0) + Number(sp.round_2_time_ms || 0),
+        completed_round_1: Boolean(sp.completed_round_1),
+        completed_round_2: Boolean(sp.completed_round_2),
+        status: sp.status || 'WAITING',
+        rank: idx + 1
+      }));
     }
   } catch (e) {
     // fallback

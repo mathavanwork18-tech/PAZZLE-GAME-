@@ -84,13 +84,28 @@ CREATE TABLE IF NOT EXISTS avatars (
 -- Player statuses: JOINED, READY, PLAYING, COMPLETED_ROUND_1, PLAYING_ROUND_2, COMPLETED, TIME_UP, DISCONNECTED, REMOVED
 CREATE TABLE IF NOT EXISTS players (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    match_id UUID NOT NULL DEFAULT '00000000-0000-0000-0000-000000000002' REFERENCES matches(id) ON DELETE CASCADE,
     name VARCHAR(50) NOT NULL,
-    animal_id VARCHAR(50) NOT NULL REFERENCES avatars(id),
+    player_code VARCHAR(50),
+    animal_id VARCHAR(50) NOT NULL DEFAULT 'fox' REFERENCES avatars(id),
     accessory_id VARCHAR(50) DEFAULT 'none',
-    status VARCHAR(30) NOT NULL DEFAULT 'JOINED',
+    hat_id VARCHAR(50) DEFAULT 'none',
+    glasses_id VARCHAR(50) DEFAULT 'none',
+    outfit_id VARCHAR(50) DEFAULT 'none',
+    total_score INT DEFAULT 0,
+    coins INT DEFAULT 0,
+    round_1_score INT DEFAULT 0,
+    round_2_score INT DEFAULT 0,
+    round_1_moves INT DEFAULT 0,
+    round_2_moves INT DEFAULT 0,
+    round_1_time_ms BIGINT DEFAULT 0,
+    round_2_time_ms BIGINT DEFAULT 0,
+    completed_round_1 BOOLEAN DEFAULT false,
+    completed_round_2 BOOLEAN DEFAULT false,
+    status VARCHAR(30) NOT NULL DEFAULT 'WAITING',
     connection_status VARCHAR(20) NOT NULL DEFAULT 'connected', -- 'connected', 'disconnected'
-    session_token_hash VARCHAR(128) NOT NULL,
+    session_token TEXT,
+    session_token_hash VARCHAR(128) NOT NULL DEFAULT '',
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     completed_at TIMESTAMPTZ,
@@ -202,13 +217,34 @@ ALTER TABLE puzzles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE player_rounds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scores ENABLE ROW LEVEL SECURITY;
 
+-- Grants for table access
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON TABLE players TO anon, authenticated;
+GRANT ALL ON TABLE player_sessions TO anon, authenticated;
+GRANT ALL ON TABLE player_rounds TO anon, authenticated;
+GRANT ALL ON TABLE scores TO anon, authenticated;
+GRANT ALL ON TABLE matches TO anon, authenticated;
+GRANT ALL ON TABLE avatars TO anon, authenticated;
+GRANT ALL ON TABLE puzzles TO anon, authenticated;
+
 -- Public can view active event, published avatars, active match status
 CREATE POLICY "Public read active events" ON events FOR SELECT USING (is_active = true);
 CREATE POLICY "Public read published avatars" ON avatars FOR SELECT USING (active = true);
 CREATE POLICY "Public read matches" ON matches FOR SELECT USING (true);
-CREATE POLICY "Public read players in match" ON players FOR SELECT USING (true);
+CREATE POLICY "Public update matches" ON matches FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Public read players" ON players FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Public insert players" ON players FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Public update players" ON players FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Public read player_sessions" ON player_sessions FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Public insert player_sessions" ON player_sessions FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Public update player_sessions" ON player_sessions FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Public read player_rounds" ON player_rounds FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "Public insert player_rounds" ON player_rounds FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Public update player_rounds" ON player_rounds FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Public read puzzles metadata" ON puzzles FOR SELECT USING (status = 'PUBLISHED');
 CREATE POLICY "Public read scores" ON scores FOR SELECT USING (true);
+CREATE POLICY "Public insert scores" ON scores FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "Public update scores" ON scores FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 
 -- ==========================================================
 -- SEED DATA: THE 16 CARTOON ANIMAL AVATARS
