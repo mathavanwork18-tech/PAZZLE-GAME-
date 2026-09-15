@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MatchState, Player, Avatar, HatId, GlassesId, OutfitId } from './types/game';
 import { Navbar } from './components/Navbar';
 import { ToastContainer, ToastItem } from './components/ToastContainer';
@@ -11,6 +11,7 @@ import { GamePage } from './pages/GamePage';
 import { ResultPage } from './pages/ResultPage';
 import { AdminPage } from './pages/AdminPage';
 import { fetchAvatars, fetchMatchState, joinPlayer, restoreSession, sendHeartbeat } from './services/api';
+import { initRealtime, trackPlayerPresence } from './services/realtime';
 
 type AppView = 
   | 'welcome'
@@ -42,8 +43,6 @@ export const App: React.FC = () => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [isJoining, setIsJoining] = useState<boolean>(false);
   const [countdown, setCountdown] = useState<number | null>(null);
-
-  const wsRef = useRef<WebSocket | null>(null);
 
   // Toast Notification Helper
   const showToast = (message: string) => {
@@ -103,109 +102,73 @@ export const App: React.FC = () => {
     init();
   }, []);
 
-  // WebSocket Connection
+  // Unified Multiplayer Engine (Supabase Realtime Cloud Sync - Connects all devices globally)
   useEffect(() => {
-    let reconnectTimeout: any;
-
-    const connectWs = () => {
-      let wsUrl: string;
-      const envWs = (import.meta.env.VITE_WS_URL || '').trim();
-      const envApi = (import.meta.env.VITE_API_URL || '').trim();
-
-      if (envWs) {
-        wsUrl = envWs.endsWith('/ws') ? envWs : `${envWs.replace(/\/$/, '')}/ws`;
-      } else if (envApi) {
-        const wsProtocol = envApi.startsWith('https:') ? 'wss:' : 'ws:';
-        const host = envApi.replace(/^https?:\/\//, '').split('/')[0];
-        wsUrl = `${wsProtocol}//${host}/ws`;
-      } else {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        wsUrl = `${protocol}//${window.location.host}/ws`;
-      }
-
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setIsConnected(true);
-        if (player) {
-          ws.send(JSON.stringify({ type: 'IDENTIFY', session_token: player.session_token }));
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.server_now) {
-            setServerNowOffset(Date.now() - data.server_now);
-          }
-
-          if (data.type === 'MATCH_STATE_UPDATE') {
-            const nextState: MatchState = data.payload;
-            setMatchState((prev) => {
-              // Trigger 3-2-1 countdown if match is started by admin
-              if (prev && prev.status === 'WAITING' && nextState.status === 'ROUND_1') {
-                runCountdown();
-              }
-              return nextState;
-            });
-
-            // Route active connected players
-            if (nextState.status === 'ROUND_1' || nextState.status === 'ROUND_2') {
-              setCurrentView((prev) => {
-                if (prev === 'lobby' || prev === 'welcome' || prev === 'setup-username' || prev === 'setup-avatar' || prev === 'setup-customize') {
-                  return 'game';
-                }
-                return prev;
-              });
-            } else if (nextState.status === 'COMPLETED') {
-              setCurrentView((prev) => (prev === 'game' ? 'results' : prev));
-            } else if (nextState.status === 'WAITING') {
-              // If match was reset
-              setCurrentView((prev) => (prev === 'game' || prev === 'results' ? 'lobby' : prev));
-            }
-          } else if (data.type === 'PLAYERS_LIST_UPDATE') {
-            setPlayersList(data.payload.players || []);
-          } else if (data.type === 'MATCH_STARTED') {
+    const cleanup = initRealtime({
+      onConnectionChange: (connected) => {
+        setIsConnected(connected);
+      },
+      onMatchStateChange: (nextState: MatchState) => {
+        setMatchState((prev) => {
+          if (prev && prev.status === 'WAITING' && nextState.status === 'ROUND_1') {
             runCountdown();
-          } else if (data.type === 'MATCH_STOPPED') {
-            showToast(data.payload?.message || 'Match stopped by administrator');
-          } else if (data.type === 'MATCH_RESET') {
-            showToast('Match progress has been reset by organizer');
-            // Refresh player object
-            handleRefreshPlayer();
-          } else if (data.type === 'TOAST') {
-            showToast(data.payload.message);
           }
-        } catch (e) {
-          // ignore
+          return nextState;
+        });
+
+        // Route active connected players based on match state
+        if (nextState.status === 'ROUND_1' || nextState.status === 'ROUND_2') {
+          setCurrentView((prev) => {
+            if (prev === 'lobby' || prev === 'welcome' || prev === 'setup-username' || prev === 'setup-avatar' || prev === 'setup-customize') {
+              return 'game';
+            }
+            return prev;
+          });
+        } else if (nextState.status === 'COMPLETED') {
+          setCurrentView((prev) => (prev === 'game' ? 'results' : prev));
+        } else if (nextState.status === 'WAITING') {
+          setCurrentView((prev) => (prev === 'game' || prev === 'results' ? 'lobby' : prev));
         }
-      };
-
-      ws.onclose = () => {
-        setIsConnected(false);
-        reconnectTimeout = setTimeout(connectWs, 2500);
-      };
-
-      ws.onerror = () => {
-        ws.close();
-      };
-    };
-
-    connectWs();
+      },
+      onPlayersListChange: (list: Player[]) => {
+        setPlayersList(list);
+      },
+      onToast: (message: string) => {
+        showToast(message);
+      },
+      onCountdown: () => {
+        runCountdown();
+      },
+      onPlayerKicked: (kickedId: string) => {
+        if (player && (player.id === kickedId || player.player_id === kickedId)) {
+          localStorage.removeItem('eng_player_token');
+          localStorage.removeItem('eng_player_data');
+          setPlayer(null);
+          setCurrentView('welcome');
+          showToast('You were removed from the match by an administrator.');
+        }
+      }
+    });
 
     return () => {
-      clearTimeout(reconnectTimeout);
-      if (wsRef.current) wsRef.current.close();
+      cleanup();
     };
-  }, [player?.session_token]);
+  }, [player?.id]);
+
+  // Keep player presence updated across room whenever player state updates
+  useEffect(() => {
+    if (player) {
+      trackPlayerPresence(player);
+    }
+  }, [player]);
 
   // Periodic heartbeat
   useEffect(() => {
     if (!player) return;
     const interval = setInterval(() => {
       sendHeartbeat(player.session_token);
-    }, 10000);
+      trackPlayerPresence(player);
+    }, 8000);
     return () => clearInterval(interval);
   }, [player]);
 
@@ -247,10 +210,7 @@ export const App: React.FC = () => {
       setPlayer(res.player);
       localStorage.setItem('eng_player_token', res.session_token);
       setMatchState(res.match_state);
-
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'IDENTIFY', session_token: res.session_token }));
-      }
+      await trackPlayerPresence(res.player);
 
       showToast(`Welcome ${res.player.name}! You've entered the lobby.`);
       

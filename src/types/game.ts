@@ -87,6 +87,7 @@ export interface Player {
   round_2_time_ms?: number;
   shuffled_puzzle_r1?: number[];
   shuffled_puzzle_r2?: number[];
+  current_round?: number;
 }
 
 export interface PuzzleInfo {
