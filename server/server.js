@@ -67,9 +67,9 @@ const canonicalSolution25 = Array.from({ length: 25 }, (_, i) => i);
 
 const initialPuzzles = {
   round1: {
-    id: 'puz-r1-robotics',
-    title: 'Student Robotics & Automation Workshop',
-    description: 'Autonomous robotics rover assembly and electronics workshop',
+    id: 'puz-r1-coding',
+    title: 'Adventure Awaits: Code, Explore, Create',
+    description: 'Outdoor Engineering: Python, Data Science, AI & Machine Learning with your loyal companion',
     image_url: '/puzzles/round1_robotics.webp',
     difficulty: 'EASY',
     grid_size: 5,
@@ -78,9 +78,9 @@ const initialPuzzles = {
     shuffled_order: generateShuffledArray(25)
   },
   round2: {
-    id: 'puz-r2-quantum',
-    title: 'Engineering Builds a Better Tomorrow',
-    description: 'Multi-discipline innovation: Aerospace, Robotics, AI, Renewable Energy & Civil Engineering',
+    id: 'puz-r2-creativity',
+    title: 'Puzzle Game: Piece by Piece',
+    description: 'Late-night workstation: Code, Create, Solve, Grow with cozy focus and companionship',
     image_url: '/puzzles/round2_quantum.webp',
     difficulty: 'EASY',
     grid_size: 5,
@@ -1243,8 +1243,20 @@ Respond ONLY with valid JSON.`;
     const parsed = JSON.parse(cleanJson);
     res.json({ success: true, puzzle: parsed });
   } catch (err) {
-    console.error('Gemini puzzle generation error:', err);
-    res.status(500).json({ success: false, error: 'Gemini AI generation failed.' });
+    console.warn('Gemini AI unavailable or capacity error, returning fallback puzzle:', err.message);
+    res.json({
+      success: true,
+      fallback: true,
+      puzzle: {
+        title: `${topic || 'Engineering Innovation'} Showcase`,
+        theme: topic || 'Autonomous Systems',
+        image_prompt: `Isometric 3D concept of ${topic || 'engineering innovation'} with vibrant circuits and clean engineering workstation.`,
+        difficulty: difficulty || 'EASY',
+        grid_size: 5,
+        piece_count: 25,
+        educational_context: `Practical engineering problem-solving in ${topic || 'modern computing and robotics'}.`
+      }
+    });
   }
 });
 
