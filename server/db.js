@@ -410,6 +410,15 @@ export function removePlayer(playerId) {
   deletePlayerStmt.run(playerId, playerId);
 }
 
+export function clearAllPlayers() {
+  db.prepare('DELETE FROM players').run();
+  try {
+    db.prepare("DELETE FROM sqlite_sequence WHERE name = 'players'").run();
+  } catch (e) {
+    // ignore
+  }
+}
+
 // MATCH STATE PERSISTENCE
 export function saveMatchState(state) {
   const stmt = db.prepare(`

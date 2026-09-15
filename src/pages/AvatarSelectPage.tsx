@@ -38,7 +38,7 @@ export const AvatarSelectPage: React.FC<AvatarSelectPageProps> = ({
           <span className="text-slate-900 font-bold">Mascot</span>
           <span className="text-slate-300">•</span>
           <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[11px]">3</span>
-          <span>Customize</span>
+          <span>Hat Style</span>
         </div>
 
         <div className="text-center mb-5">
@@ -46,7 +46,7 @@ export const AvatarSelectPage: React.FC<AvatarSelectPageProps> = ({
             Choose your animal avatar
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            Pick your Engineering Day mascot. You can customize clothes and accessories next.
+            Pick your mascot face. You can choose their hat in the next step.
           </p>
         </div>
 

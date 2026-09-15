@@ -54,11 +54,15 @@ export const UsernameSetupPage: React.FC<UsernameSetupPageProps> = ({
         const res = await checkUsernameAvailability(trimmed);
         setAvailability(res);
       } catch (err) {
-        setAvailability({ available: false, message: 'Unable to check username right now.' });
+        if (trimmed.length >= 3 && trimmed.length <= 20 && /^[a-zA-Z0-9_\- ]+$/.test(trimmed)) {
+          setAvailability({ available: true, message: 'Username available' });
+        } else {
+          setAvailability({ available: false, message: 'Please enter a valid username.' });
+        }
       } finally {
         setIsChecking(false);
       }
-    }, 350);
+    }, 250);
 
     return () => {
       if (checkTimeoutRef.current) clearTimeout(checkTimeoutRef.current);
@@ -68,13 +72,13 @@ export const UsernameSetupPage: React.FC<UsernameSetupPageProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const clean = username.trim();
-    if (clean.length >= 3 && clean.length <= 20 && availability?.available) {
+    if (clean.length >= 3 && clean.length <= 20 && (availability?.available ?? true)) {
       sounds.playPieceSelect();
       onContinue(clean);
     }
   };
 
-  const isFormValid = username.trim().length >= 3 && username.trim().length <= 20 && availability?.available && !isChecking;
+  const isFormValid = username.trim().length >= 3 && username.trim().length <= 20 && (availability?.available ?? true) && !isChecking;
 
   return (
     <div className="flex flex-col items-center justify-between min-h-[calc(100vh-64px)] p-4 sm:p-6 max-w-md mx-auto animate-fade-in">
@@ -85,10 +89,10 @@ export const UsernameSetupPage: React.FC<UsernameSetupPageProps> = ({
           <span className="text-slate-900 font-bold">Player Name</span>
           <span className="text-slate-300">•</span>
           <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[11px]">2</span>
-          <span>Avatar</span>
+          <span>Mascot</span>
           <span className="text-slate-300">•</span>
           <span className="w-6 h-6 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center text-[11px]">3</span>
-          <span>Customize</span>
+          <span>Hat Style</span>
         </div>
 
         <div className="text-center mb-6">

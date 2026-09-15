@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import {
   adminLogin, adminStartMatch, adminStopMatch, adminPause,
-  adminResume, adminResetMatch, adminEndMatch, adminRemovePlayer
+  adminResume, adminResetMatch, adminEndMatch, adminRemovePlayer,
+  adminClearAllPlayers
 } from '../services/api';
 import { AvatarRenderer } from '../components/AvatarRenderer';
 
@@ -150,6 +151,27 @@ export const AdminPage: React.FC<AdminPageProps> = ({
         setActionLoading(true);
         try {
           await adminEndMatch(adminToken);
+          await onRefreshState();
+        } catch (e: any) {
+          alert(e.message);
+        } finally {
+          setActionLoading(false);
+          setConfirmModal(null);
+        }
+      }
+    });
+  };
+
+  const handleClearAllPlayers = () => {
+    setConfirmModal({
+      title: 'Wipe All Players & Dummy Data?',
+      description: `This will completely remove all ${playersList.length} player registrations from the database so fresh players can register and join cleanly.`,
+      confirmText: 'CLEAR ALL PLAYERS',
+      danger: true,
+      action: async () => {
+        setActionLoading(true);
+        try {
+          await adminClearAllPlayers(adminToken);
           await onRefreshState();
         } catch (e: any) {
           alert(e.message);
@@ -437,6 +459,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({
             >
               <Square className="w-4 h-4" />
               <span>END MATCH</span>
+            </button>
+          )}
+
+          {/* CLEAR ALL PLAYERS / WIPE DUMMY DATA */}
+          {playersList.length > 0 && (
+            <button
+              onClick={handleClearAllPlayers}
+              disabled={actionLoading}
+              className="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold flex items-center space-x-1.5 border border-rose-200 transition-all btn-press"
+            >
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span>CLEAR ALL PLAYERS</span>
             </button>
           )}
         </div>

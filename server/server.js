@@ -40,7 +40,11 @@ const avatarsList = [
   { id: 'penguin', name: 'Penguin', image_url: '/avatars/penguin.png', accent_color: '#06B6D4' },
   { id: 'koala', name: 'Koala', image_url: '/avatars/koala.png', accent_color: '#8B5CF6' },
   { id: 'monkey', name: 'Monkey', image_url: '/avatars/monkey.png', accent_color: '#84CC16' },
-  { id: 'elephant', name: 'Elephant', image_url: '/avatars/elephant.png', accent_color: '#64748B' }
+  { id: 'elephant', name: 'Elephant', image_url: '/avatars/elephant.png', accent_color: '#64748B' },
+  { id: 'frog', name: 'Frog', image_url: '/avatars/frog.png', accent_color: '#14B8A6' },
+  { id: 'raccoon', name: 'Raccoon', image_url: '/avatars/raccoon.png', accent_color: '#8B5CF6' },
+  { id: 'giraffe', name: 'Giraffe', image_url: '/avatars/giraffe.png', accent_color: '#06B6D4' },
+  { id: 'zebra', name: 'Zebra', image_url: '/avatars/zebra.png', accent_color: '#9333EA' }
 ];
 
 // Helper to generate non-trivial shuffled permutation for 25-piece grid
@@ -829,6 +833,17 @@ app.post('/api/admin/remove-player', requireAdmin, (req, res) => {
     }
   }
   res.status(404).json({ success: false, error: 'Player not found.' });
+});
+
+// Clear All Players (Wipe Dummy / Test Data)
+app.post('/api/admin/clear-all-players', requireAdmin, (req, res) => {
+  db.clearAllPlayers();
+  players.clear();
+  usernamesMap.clear();
+  processedRequests.clear();
+  broadcastPlayersList();
+  broadcast('TOAST', { message: 'All player records have been cleared by admin.' });
+  res.json({ success: true, message: 'All players cleared.', player_count: 0 });
 });
 
 // Update settings
