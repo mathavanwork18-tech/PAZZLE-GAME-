@@ -56,7 +56,7 @@ export async function runAllBackendAndDbTests() {
   const adminLoginRes = await fetch(`${BASE_URL}/admin/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: 'admin@123' })
+    body: JSON.stringify({ code: process.env.ADMIN_INITIAL_CODE || 'admin@1977' })
   });
   const { admin_token } = await adminLoginRes.json();
 
@@ -124,7 +124,7 @@ export async function runAllBackendAndDbTests() {
   }
 
   // A004: Environment variables
-  const envAdmin = process.env.ADMIN_INITIAL_CODE || 'admin@123';
+  const envAdmin = process.env.ADMIN_INITIAL_CODE || 'admin@1977';
   const envEmerg = process.env.EMERGENCY_REJOIN_CODE || '0000';
   recordTest({
     id: 'A004',

@@ -15,10 +15,11 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promi
   try {
     res = await fetch(url, options);
   } catch (netErr: any) {
-    // If relative /api failed in local dev on port 5173, fallback directly to port 3001
+    // If relative /api failed in local dev on port 5173, fallback directly to port 3001 using client hostname
     if (typeof window !== 'undefined' && window.location.port === '5173' && url.startsWith('/api')) {
+      const host = window.location.hostname || '127.0.0.1';
       try {
-        res = await fetch(`http://localhost:3001${url}`, options);
+        res = await fetch(`http://${host}:3001${url}`, options);
       } catch (e) {
         throw new Error('Cannot connect to backend server. Please verify server is running on port 3001.');
       }
@@ -32,8 +33,9 @@ async function safeFetchJson<T = any>(url: string, options?: RequestInit): Promi
   // If server/proxy returned an HTML document (<!DOCTYPE html>...), handle gracefully
   if (text.trim().startsWith('<') || text.includes('<!DOCTYPE')) {
     if (typeof window !== 'undefined' && window.location.port === '5173' && url.startsWith('/api')) {
+      const host = window.location.hostname || '127.0.0.1';
       try {
-        const directRes = await fetch(`http://localhost:3001${url}`, options);
+        const directRes = await fetch(`http://${host}:3001${url}`, options);
         const directText = await directRes.text();
         if (!directText.trim().startsWith('<')) {
           const directData = JSON.parse(directText);

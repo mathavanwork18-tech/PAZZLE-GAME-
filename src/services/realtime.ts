@@ -93,9 +93,10 @@ function getWebSocketUrl(): string {
   const wsProto = isHttps ? 'wss:' : 'ws:';
 
   // In local Vite dev environment on port 5173, connect directly to Express server on 3001
-  // to avoid any proxy latency or proxy drops
-  if (window.location.port === '5173' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-    return `${wsProto}//${window.location.hostname}:3001/ws`;
+  // using whatever hostname/IP the client accessed (e.g. localhost, 10.x.x.x, 192.168.x.x)
+  if (window.location.port === '5173') {
+    const host = window.location.hostname || '127.0.0.1';
+    return `${wsProto}//${host}:3001/ws`;
   }
 
   return `${wsProto}//${window.location.host}/ws`;

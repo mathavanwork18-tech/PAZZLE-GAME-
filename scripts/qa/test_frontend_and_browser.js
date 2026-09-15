@@ -353,7 +353,7 @@ async function runBrowserTestSuite() {
     const passInput = await page.$('input[type="password"]');
     console.log('DEBUG: passInput found =', !!passInput);
     if (passInput) {
-      await passInput.type('admin@123');
+      await passInput.type(process.env.ADMIN_INITIAL_CODE || 'admin@1977');
       const submitBtn = await page.$('button[type="submit"]');
       console.log('DEBUG: submitBtn found =', !!submitBtn);
       if (submitBtn) {

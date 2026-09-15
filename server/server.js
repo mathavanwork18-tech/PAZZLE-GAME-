@@ -17,7 +17,7 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
-const ADMIN_CODE = process.env.ADMIN_INITIAL_CODE || 'admin@123';
+const ADMIN_CODE = process.env.ADMIN_INITIAL_CODE || 'admin@1977';
 const EMERGENCY_REJOIN_CODE = process.env.EMERGENCY_REJOIN_CODE || '0000';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 
@@ -1304,9 +1304,9 @@ wss.on('error', (err) => {
   console.error('WebSocket server error:', err.message);
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 Engineering Day Puzzle Challenge Server running on port ${PORT}`);
-  console.log(`📡 WebSocket endpoint ready at ws://localhost:${PORT}/ws`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Engineering Day Puzzle Challenge Server running on port ${PORT} (0.0.0.0)`);
+  console.log(`📡 WebSocket endpoint ready at ws://0.0.0.0:${PORT}/ws`);
   console.log(`🔑 Admin initial access code: ${ADMIN_CODE}`);
   console.log(`🛡️ Emergency Admission Rejoin Code: ${EMERGENCY_REJOIN_CODE}`);
 });
