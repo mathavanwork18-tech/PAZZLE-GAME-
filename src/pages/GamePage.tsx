@@ -4,7 +4,8 @@ import { PuzzleBoard } from '../components/PuzzleBoard';
 import { CountdownTimer } from '../components/CountdownTimer';
 import { AvatarRenderer } from '../components/AvatarRenderer';
 import { Trophy, Coins, CheckCircle2, AlertTriangle, ArrowRight, Pause, Ban, Sparkles } from 'lucide-react';
-import { submitPuzzle, advanceRound2 } from '../services/api';
+import { submitPuzzle, advanceRound2, savePlayerToSupabase } from '../services/api';
+import { trackPlayerPresence } from '../services/realtime';
 import { sounds } from '../services/sound';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -42,6 +43,19 @@ export const GamePage: React.FC<GamePageProps> = ({
     }
   });
 
+  // Track slots that have already awarded the 25-coin reward in current round
+  const [rewardedSlots, setRewardedSlots] = useState<Set<number>>(() => {
+    const initSet = new Set<number>();
+    const initialArr = isRound1
+      ? (player.shuffled_puzzle_r1 || [])
+      : (player.shuffled_puzzle_r2 || []);
+    initialArr.forEach((val, idx) => {
+      if (val === idx) initSet.add(idx);
+    });
+    return initSet;
+  });
+
+  const [coinNotification, setCoinNotification] = useState<{ amount: number; key: number } | null>(null);
   const [moveCount, setMoveCount] = useState<number>(0);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [showCompletionAnimation, setShowCompletionAnimation] = useState<boolean>(false);
@@ -49,26 +63,71 @@ export const GamePage: React.FC<GamePageProps> = ({
   const [coinsEarned, setCoinsEarned] = useState<number>(0);
   const [transitionToRound2, setTransitionToRound2] = useState<boolean>(false);
 
-  // Switch puzzle image on round switch
-  const activePuzzle = matchState.current_puzzle;
+  // Switch puzzle image on round switch (Both rounds are Easy 5x5 25 pieces)
   const imageUrl = isRound1
     ? '/puzzles/round1_robotics.webp'
     : '/puzzles/round2_quantum.webp';
 
-  // Handle player transitioning to Round 2
+  // Broadcast initial board on mount so admin can spectate immediately
+  useEffect(() => {
+    player.current_board = pieces;
+    player.correct_pieces_count = pieces.filter((val, idx) => val === idx).length;
+    trackPlayerPresence(player);
+  }, []);
+
+  // Handle player transitioning to Round 2 (5x5 Easy)
   useEffect(() => {
     if (isRound2 && pieces.length === 25) {
       if (player.shuffled_puzzle_r2) {
         setPieces([...player.shuffled_puzzle_r2]);
+        // Reset rewarded slots for Round 2
+        const r2Rewarded = new Set<number>();
+        player.shuffled_puzzle_r2.forEach((val, idx) => {
+          if (val === idx) r2Rewarded.add(idx);
+        });
+        setRewardedSlots(r2Rewarded);
+
+        player.current_board = player.shuffled_puzzle_r2;
+        player.correct_pieces_count = player.shuffled_puzzle_r2.filter((val, idx) => val === idx).length;
+        trackPlayerPresence(player);
       }
     }
   }, [isRound2]);
 
-  // Handle tile moves and auto-validation
+  // Handle tile moves, auto-validation, and +25 coin reward per correct piece
   const handlePiecesChange = async (newPieces: number[], addedMoves: number) => {
     setPieces(newPieces);
     const updatedMoves = moveCount + addedMoves;
     setMoveCount(updatedMoves);
+
+    // Check if any piece was newly joined into its correct slot
+    let newlyCorrectCount = 0;
+    const nextRewarded = new Set(rewardedSlots);
+
+    newPieces.forEach((val, idx) => {
+      if (val === idx && !nextRewarded.has(idx)) {
+        nextRewarded.add(idx);
+        newlyCorrectCount++;
+      }
+    });
+
+    if (newlyCorrectCount > 0) {
+      const addedCoins = newlyCorrectCount * 25;
+      setRewardedSlots(nextRewarded);
+      player.coins = (player.coins || 0) + addedCoins;
+      sounds.playCoinsEarned();
+      setCoinNotification({ amount: addedCoins, key: Date.now() });
+      setTimeout(() => setCoinNotification(null), 1800);
+
+      // Save updated player state locally and to Supabase
+      localStorage.setItem('eng_player_data', JSON.stringify(player));
+      savePlayerToSupabase(player);
+    }
+
+    // Mirror current board state to Supabase presence so admin can spectate live
+    player.current_board = newPieces;
+    player.correct_pieces_count = newPieces.filter((val, idx) => val === idx).length;
+    trackPlayerPresence(player);
 
     // Auto-check if all 25 pieces are in canonical order
     const isSolved = newPieces.every((val, idx) => val === canonicalSolution[idx]);
@@ -197,9 +256,22 @@ export const GamePage: React.FC<GamePageProps> = ({
         </div>
       </div>
 
+      {/* Floating +25 Coins Toast */}
+      {coinNotification && (
+        <div
+          key={coinNotification.key}
+          className="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-amber-400 text-slate-950 font-black px-4 py-2 rounded-full shadow-xl border-2 border-amber-300 flex items-center space-x-2 animate-bounce"
+        >
+          <Sparkles className="w-5 h-5 text-amber-950 fill-amber-950" />
+          <span>+{coinNotification.amount} COINS! Piece in place!</span>
+        </div>
+      )}
+
       {/* 2. Round Info Banner */}
       <div className="w-full flex items-center justify-between px-2 mb-2 text-xs font-semibold text-slate-600">
-        <span>{isRound1 ? '5×5 Grid • Student Robotics & Automation Workshop' : '25 Pieces • Engineering Builds a Better Tomorrow'}</span>
+        <span className="font-bold text-blue-700">
+          {isRound1 ? 'Round 1: 5×5 Easy (25 Pieces) • Robotics Lab' : 'Round 2: 5×5 Easy (25 Pieces) • Future Engineering'}
+        </span>
         <span className="font-mono text-[11px] text-slate-400">{moveCount} moves</span>
       </div>
 

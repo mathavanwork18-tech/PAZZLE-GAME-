@@ -88,6 +88,8 @@ export interface Player {
   shuffled_puzzle_r1?: number[];
   shuffled_puzzle_r2?: number[];
   current_round?: number;
+  current_board?: number[];
+  correct_pieces_count?: number;
 }
 
 export interface PuzzleInfo {

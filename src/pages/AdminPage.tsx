@@ -3,7 +3,8 @@ import { MatchState, Player, Avatar } from '../types/game';
 import {
   Shield, Play, Pause, Square, RotateCcw,
   Users, Download, Trash2, Key, Search,
-  Clock, AlertTriangle, Coins, Ban
+  Clock, AlertTriangle, Coins, Ban, Eye,
+  ChevronLeft, ChevronRight, X, Check, Activity
 } from 'lucide-react';
 import {
   adminLogin, adminStartMatch, adminStopMatch, adminPause,
@@ -32,6 +33,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [filterTab, setFilterTab] = useState<'all' | 'playing' | 'completed' | 'disconnected'>('all');
+  const [spectatingPlayer, setSpectatingPlayer] = useState<Player | null>(null);
 
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
@@ -584,11 +586,21 @@ export const AdminPage: React.FC<AdminPageProps> = ({
                   </div>
                 </div>
 
+                {/* Spectate Live Board Button */}
+                <button
+                  onClick={() => setSpectatingPlayer(p)}
+                  title="Spectate Player Board (Read Only)"
+                  className="px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center space-x-1.5 border border-blue-200 transition-all btn-press shrink-0 ml-2"
+                >
+                  <Eye className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="hidden sm:inline">Spectate</span>
+                </button>
+
                 {matchState.status === 'WAITING' && (
                   <button
                     onClick={() => handleKickPlayer(p.id)}
                     title="Remove Player"
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-2"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors ml-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -598,6 +610,192 @@ export const AdminPage: React.FC<AdminPageProps> = ({
           )}
         </div>
       </div>
+
+      {/* 5. Live Player Spectator Modal (Strictly Read-Only Mirror) */}
+      {spectatingPlayer && (() => {
+        const livePlayer = playersList.find(p => p.id === spectatingPlayer.id) || spectatingPlayer;
+        const isR1 = !livePlayer.completed_round_1;
+        const puzzleImg = isR1 ? '/puzzles/round1_robotics.webp' : '/puzzles/round2_quantum.webp';
+        const board = livePlayer.current_board || (isR1 ? livePlayer.shuffled_puzzle_r1 : livePlayer.shuffled_puzzle_r2) || Array.from({ length: 25 }, (_, i) => i);
+        const correctPieces = board.filter((val, idx) => val === idx).length;
+        const currentIdx = filteredPlayers.findIndex(p => p.id === livePlayer.id);
+
+        const handlePrevPlayer = () => {
+          if (filteredPlayers.length > 0) {
+            const nextIdx = (currentIdx - 1 + filteredPlayers.length) % filteredPlayers.length;
+            setSpectatingPlayer(filteredPlayers[nextIdx]);
+          }
+        };
+
+        const handleNextPlayer = () => {
+          if (filteredPlayers.length > 0) {
+            const nextIdx = (currentIdx + 1) % filteredPlayers.length;
+            setSpectatingPlayer(filteredPlayers[nextIdx]);
+          }
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-y-auto">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center space-x-2.5">
+                  <div className="w-9 h-9 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200">
+                    <Eye className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase text-slate-900 tracking-wide flex items-center space-x-2">
+                      <span>Live Player Spectator</span>
+                      <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>LIVE MIRROR</span>
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400">
+                      Read-only live board view • Admin observation only
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSpectatingPlayer(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Player Profile Header Card */}
+              <div className="my-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <AvatarRenderer
+                    animalId={livePlayer.animal_id}
+                    hatId={livePlayer.hat_id}
+                    glassesId={livePlayer.glasses_id}
+                    outfitId={livePlayer.outfit_id}
+                    size="sm"
+                    className="border shadow-none bg-white"
+                  />
+                  <div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[10px] font-mono font-bold text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded">
+                        {livePlayer.player_id || livePlayer.id}
+                      </span>
+                      <span className="text-xs font-bold text-slate-900">{livePlayer.name}</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 capitalize mt-0.5">
+                      Mascot: {livePlayer.animal_id} • Hat: {livePlayer.hat_id ? livePlayer.hat_id.replace(/_/g, ' ') : 'none'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 font-mono">
+                    {isR1 ? 'Round 1 (5×5 Easy)' : 'Round 2 (5×5 Easy)'}
+                  </span>
+                  <div className="text-[10px] font-bold text-slate-600 font-mono mt-0.5">
+                    Score: {livePlayer.total_score || 0} • Coins: {livePlayer.coins || 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Pieces Correctly Solved Progress Meter */}
+              <div className="mb-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
+                  <span className="flex items-center space-x-1.5">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Pieces in Correct Place</span>
+                  </span>
+                  <span className="font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    {correctPieces} / 25 ({Math.round((correctPieces / 25) * 100)}%)
+                  </span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden border border-slate-200">
+                  <div
+                    className="bg-emerald-500 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${(correctPieces / 25) * 100}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Live 5x5 Board View (Strictly Read-Only) */}
+              <div className="flex flex-col items-center justify-center p-3 bg-slate-100 rounded-2xl border border-slate-200">
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(5, 1fr)',
+                    gridTemplateRows: 'repeat(5, 1fr)'
+                  }}
+                  className="gap-1 p-1 bg-slate-300 rounded-2xl border border-slate-300 w-full max-w-[280px] sm:max-w-[320px] aspect-square shadow-inner pointer-events-none select-none"
+                >
+                  {board.map((val, slotIdx) => {
+                    const origCol = val % 5;
+                    const origRow = Math.floor(val / 5);
+                    const bgPosX = (origCol / 4) * 100;
+                    const bgPosY = (origRow / 4) * 100;
+                    const isCorrect = val === slotIdx;
+
+                    return (
+                      <div
+                        key={slotIdx}
+                        style={{
+                          backgroundImage: `url(${puzzleImg})`,
+                          backgroundSize: '500% 500%',
+                          backgroundPosition: `${bgPosX}% ${bgPosY}%`
+                        }}
+                        className={`w-full h-full rounded-lg relative overflow-hidden transition-all shadow-xs ${
+                          isCorrect
+                            ? 'border-2 border-emerald-500 ring-1 ring-emerald-400'
+                            : 'border border-slate-400/40'
+                        }`}
+                      >
+                        {isCorrect && (
+                          <div className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-emerald-600 text-white rounded-full flex items-center justify-center shadow text-[8px] font-black">
+                            ✓
+                          </div>
+                        )}
+                        <span className="absolute bottom-0.5 left-0.5 text-[8px] font-mono font-bold text-white bg-slate-900/70 px-1 rounded">
+                          #{val + 1}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="text-[11px] text-slate-600 mt-2.5 flex items-center space-x-1.5 text-center">
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>Green border & checkmark indicates piece is placed in its correct slot (+25 coins awarded).</span>
+                </div>
+              </div>
+
+              {/* Navigation Controls across Players */}
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={handlePrevPlayer}
+                  className="px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 flex items-center space-x-1 border border-slate-200 transition-colors"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  <span>Prev Player</span>
+                </button>
+
+                <span className="text-xs font-mono text-slate-400">
+                  {currentIdx + 1} of {filteredPlayers.length}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={handleNextPlayer}
+                  className="px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 flex items-center space-x-1 border border-slate-200 transition-colors"
+                >
+                  <span>Next Player</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };

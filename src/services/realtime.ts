@@ -120,7 +120,9 @@ export function initRealtime(handlers: RealtimeHandlers) {
             round_1_time_ms: p.round_1_time_ms || 0,
             round_2_time_ms: p.round_2_time_ms || 0,
             shuffled_puzzle_r1: p.shuffled_puzzle_r1,
-            shuffled_puzzle_r2: p.shuffled_puzzle_r2
+            shuffled_puzzle_r2: p.shuffled_puzzle_r2,
+            current_board: p.current_board,
+            correct_pieces_count: p.correct_pieces_count
           } as Player);
         }
       }
@@ -213,6 +215,8 @@ export async function trackPlayerPresence(player: Player) {
         joined_at: player.joined_at,
         shuffled_puzzle_r1: player.shuffled_puzzle_r1,
         shuffled_puzzle_r2: player.shuffled_puzzle_r2,
+        current_board: player.current_board,
+        correct_pieces_count: player.correct_pieces_count,
         connection_status: 'connected'
       });
     } catch (e) {

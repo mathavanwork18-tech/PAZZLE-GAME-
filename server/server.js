@@ -87,7 +87,7 @@ const initialPuzzles = {
     title: 'Engineering Builds a Better Tomorrow',
     description: 'Multi-discipline innovation: Aerospace, Robotics, AI, Renewable Energy & Civil Engineering',
     image_url: '/puzzles/round2_quantum.webp',
-    difficulty: 'HARD',
+    difficulty: 'EASY',
     grid_size: 5,
     piece_count: 25,
     solution_order: [...canonicalSolution25],
