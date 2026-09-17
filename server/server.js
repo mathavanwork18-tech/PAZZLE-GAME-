@@ -13,7 +13,25 @@ const app = express();
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-app.use(cors());
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
+  : ['https://pazzletime.netlify.app', 'http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3001'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      process.env.NODE_ENV !== 'production' ||
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.netlify.app')
+    ) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
@@ -380,6 +398,35 @@ setInterval(() => {
 // ==========================================================
 // REST API ENDPOINTS
 // ==========================================================
+
+// Health Check Endpoint (Container & DevOps Monitoring)
+app.get(['/health', '/api/health'], (req, res) => {
+  let dbStatus = 'ok';
+  let playerCount = 0;
+  try {
+    playerCount = db.getPlayerCount();
+  } catch (e) {
+    dbStatus = 'error: ' + (e.message || 'unknown');
+  }
+
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime_seconds: Math.floor(process.uptime()),
+    server_now: Date.now(),
+    match: {
+      id: gameState.match_id,
+      status: gameState.status,
+      current_round: gameState.current_round,
+      max_players: gameState.max_players,
+      connected_ws_clients: clients.size
+    },
+    database: {
+      status: dbStatus,
+      registered_players: playerCount
+    }
+  });
+});
 
 // Get Available Mascots
 app.get('/api/avatars', (req, res) => {
@@ -1322,3 +1369,27 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🔑 Admin initial access code: ${ADMIN_CODE}`);
   console.log(`🛡️ Emergency Admission Rejoin Code: ${EMERGENCY_REJOIN_CODE}`);
 });
+
+// Graceful Shutdown Handling
+function gracefulShutdown(signal) {
+  console.log(`\n🛑 Received ${signal}. Gracefully closing HTTP and WebSocket server...`);
+  server.close(() => {
+    console.log('✅ HTTP and WebSocket server closed.');
+    try {
+      db.close();
+      console.log('✅ SQLite database connection closed safely.');
+    } catch (e) {
+      console.error('Error closing database:', e);
+    }
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    console.error('⚠️ Forcefully terminating after 5s timeout.');
+    process.exit(1);
+  }, 5000);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+

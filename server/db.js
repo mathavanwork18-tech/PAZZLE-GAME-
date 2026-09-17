@@ -759,4 +759,12 @@ export function clearAllData() {
   } catch (e) {}
 }
 
+export function close() {
+  try {
+    db.close();
+  } catch (e) {
+    // ignore if already closed
+  }
+}
+
 export default db;

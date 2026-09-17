@@ -1,0 +1,15 @@
+# Robots.txt for Engineering Day — Puzzle Challenge
+# Production Domain: https://pazzletime.netlify.app/
+
+User-agent: *
+Allow: /
+Allow: /avatars/
+Allow: /puzzles/
+Allow: /assets/
+
+# Exclude private admin console and internal endpoints from search index
+Disallow: /admin
+Disallow: /api/
+
+# Canonical Sitemap URL
+Sitemap: https://pazzletime.netlify.app/sitemap.xml

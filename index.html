@@ -2,14 +2,96 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/avatars/fox.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#F8FAFC" />
-    <meta name="description" content="Engineering Day Puzzle Challenge. Real-time multiplayer image puzzle challenge for college engineers." />
-    <title>Engineering Day — Puzzle Challenge</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    
+    <!-- Primary Metadata -->
+    <title>Engineering Day — Puzzle Challenge | Real-Time Multiplayer Game</title>
+    <meta name="title" content="Engineering Day — Puzzle Challenge | Real-Time Multiplayer Game" />
+    <meta name="description" content="Join the Engineering Day Puzzle Challenge! A real-time multiplayer image jigsaw puzzle competition for engineering students. Solve puzzles, customize animal avatars, earn coins, and climb the live leaderboard." />
+    <meta name="keywords" content="Engineering Day, puzzle challenge, multiplayer puzzle, coding puzzle, jigsaw game, real-time competition, college event" />
+    <meta name="author" content="Engineering Day Organizing Team" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="theme-color" content="#2563EB" />
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://pazzletime.netlify.app/" />
+
+    <!-- Google Search Console Verification -->
+    <meta name="google-site-verification" content="yRZMe49eKxeNEk_TgNEIitx_4u_a54oBSQAcXkdZYqg" />
+
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/png" sizes="64x64" href="/avatars/fox.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/avatars/fox.png" />
+
+    <!-- Open Graph / Facebook / LinkedIn / WhatsApp -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Engineering Day Puzzle Challenge" />
+    <meta property="og:url" content="https://pazzletime.netlify.app/" />
+    <meta property="og:title" content="Engineering Day — Puzzle Challenge | Live Multiplayer Puzzle" />
+    <meta property="og:description" content="Think, arrange, and solve. Real-time multiplayer image puzzle competition for engineering students with live leaderboard and animal mascots." />
+    <meta property="og:image" content="https://pazzletime.netlify.app/og-image.png" />
+    <meta property="og:image:secure_url" content="https://pazzletime.netlify.app/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Engineering Day Puzzle Challenge Mascots and Glowing Puzzle Banner" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://pazzletime.netlify.app/" />
+    <meta name="twitter:title" content="Engineering Day — Puzzle Challenge" />
+    <meta name="twitter:description" content="Real-time multiplayer image puzzle challenge for college engineers. Solve fast, earn coins, and top the live leaderboard!" />
+    <meta name="twitter:image" content="https://pazzletime.netlify.app/og-image.png" />
+    <meta name="twitter:image:alt" content="Engineering Day Puzzle Challenge Event Banner" />
+
+    <!-- Typography & Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+    <!-- Schema.org JSON-LD Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebApplication",
+          "@id": "https://pazzletime.netlify.app/#webapp",
+          "name": "Engineering Day — Puzzle Challenge",
+          "url": "https://pazzletime.netlify.app/",
+          "applicationCategory": "GameApplication",
+          "genre": "Puzzle",
+          "operatingSystem": "All",
+          "browserRequirements": "Requires JavaScript. Requires HTML5.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "description": "A real-time multiplayer image jigsaw puzzle competition for college engineering students.",
+          "screenshot": "https://pazzletime.netlify.app/og-image.png"
+        },
+        {
+          "@type": "Event",
+          "@id": "https://pazzletime.netlify.app/#event",
+          "name": "Engineering Day Puzzle Challenge",
+          "description": "Live real-time speed image puzzle contest where students compete on a synchronized leaderboard.",
+          "eventStatus": "https://schema.org/EventScheduled",
+          "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
+          "location": {
+            "@type": "VirtualLocation",
+            "url": "https://pazzletime.netlify.app/"
+          },
+          "organizer": {
+            "@type": "Organization",
+            "name": "Engineering Day Committee",
+            "url": "https://pazzletime.netlify.app/"
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body class="bg-slate-50 text-slate-900 min-h-screen selection:bg-blue-600 selection:text-white font-sans antialiased touch-pan-x touch-pan-y overscroll-none">
     <div id="root"></div>

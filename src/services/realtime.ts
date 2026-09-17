@@ -22,6 +22,9 @@ let activeHandlers: RealtimeHandlers | null = null;
 let wsReconnectTimer: any = null;
 let pingInterval: any = null;
 let isCleanedUp = false;
+let reconnectAttempts = 0;
+let hasLoggedStaticNotice = false;
+let hasLoggedWsError = false;
 
 export function getDefaultMatchState(): MatchState {
   try {
@@ -70,9 +73,32 @@ export function saveCachedMatchState(state: MatchState) {
 }
 
 /**
- * Determine the optimal WebSocket URL
+ * Check if the application is running on a static hosting platform (e.g. Netlify, Vercel)
+ * without an external backend URL explicitly configured.
  */
-function getWebSocketUrl(): string {
+function isStaticHostWithoutBackend(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = (window.location.hostname || '').toLowerCase();
+  const isStaticPlatform =
+    host.endsWith('.netlify.app') ||
+    host.endsWith('.vercel.app') ||
+    host.endsWith('.github.io') ||
+    host.endsWith('.pages.dev') ||
+    host.endsWith('.surge.sh');
+
+  const hasConfiguredBackend = Boolean(
+    (import.meta.env.VITE_WS_URL || '').trim() ||
+    (import.meta.env.VITE_API_URL || '').trim()
+  );
+
+  return isStaticPlatform && !hasConfiguredBackend;
+}
+
+/**
+ * Determine the optimal WebSocket URL.
+ * Returns null if running on a static host where no backend WebSocket server exists.
+ */
+function getWebSocketUrl(): string | null {
   const envWs = (import.meta.env.VITE_WS_URL || '').trim();
   if (envWs) return envWs;
 
@@ -88,6 +114,12 @@ function getWebSocketUrl(): string {
   }
 
   if (typeof window === 'undefined') return 'ws://localhost:3001/ws';
+
+  // Netlify and other static platforms cannot host persistent native WebSocket servers.
+  // Returning null avoids repeated "WebSocket connection to 'wss://.../ws' failed" console errors.
+  if (isStaticHostWithoutBackend()) {
+    return null;
+  }
 
   const isHttps = window.location.protocol === 'https:';
   const wsProto = isHttps ? 'wss:' : 'ws:';
@@ -112,6 +144,17 @@ function connectNativeWebSocket(handlers: RealtimeHandlers) {
   }
 
   const wsUrl = getWebSocketUrl();
+  if (!wsUrl) {
+    if (!hasLoggedStaticNotice) {
+      hasLoggedStaticNotice = true;
+      console.info(
+        `ℹ️ [Realtime] Native WebSocket skipped: Frontend is running on Netlify/static host (${window.location.hostname}) without VITE_WS_URL configured.\n` +
+        `Netlify cannot host persistent WebSocket servers. Supabase Realtime channel is active for live sync.\n` +
+        `To enable the native WebSocket server, deploy server/server.js (e.g. on Render or Railway) and set VITE_WS_URL in Netlify environment variables.`
+      );
+    }
+    return;
+  }
 
   try {
     const ws = new WebSocket(wsUrl);
@@ -119,6 +162,8 @@ function connectNativeWebSocket(handlers: RealtimeHandlers) {
 
     ws.onopen = () => {
       if (ws !== nativeWs) return;
+      reconnectAttempts = 0;
+      hasLoggedWsError = false;
       console.log('📡 Connected to Server Native WebSocket at', wsUrl);
       handlers.onConnectionChange(true);
 
@@ -212,8 +257,12 @@ function connectNativeWebSocket(handlers: RealtimeHandlers) {
       }
     };
 
-    ws.onerror = (err) => {
-      console.warn('Native WebSocket error on', wsUrl);
+    ws.onerror = () => {
+      // Avoid spamming the console repeatedly on reconnect attempts
+      if (!hasLoggedWsError && reconnectAttempts < 2) {
+        hasLoggedWsError = true;
+        console.warn(`[Realtime] Native WebSocket unreachable at ${wsUrl}. Retrying with exponential backoff...`);
+      }
     };
 
     ws.onclose = () => {
@@ -223,16 +272,24 @@ function connectNativeWebSocket(handlers: RealtimeHandlers) {
         if (!isCleanedUp) {
           handlers.onConnectionChange(false);
           clearTimeout(wsReconnectTimer);
+
+          reconnectAttempts++;
+          // Exponential backoff: ~1.5s -> 2.25s -> 3.37s -> 5s -> 7.5s ... max 30s
+          const delay = Math.min(30000, Math.round(1500 * Math.pow(1.5, Math.min(reconnectAttempts, 8))));
+
           wsReconnectTimer = setTimeout(() => {
             if (activeHandlers && !isCleanedUp) {
               connectNativeWebSocket(activeHandlers);
             }
-          }, 2000);
+          }, delay);
         }
       }
     };
   } catch (e) {
-    console.warn('Failed to establish Native WebSocket connection:', e);
+    if (!hasLoggedWsError) {
+      hasLoggedWsError = true;
+      console.warn('Failed to establish Native WebSocket connection:', e);
+    }
   }
 }
 
